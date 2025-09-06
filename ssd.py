@@ -24,8 +24,8 @@ TARGET_MARK = 75
 ATT_REQ = 75.0
 
 DEFAULT_CREDITS = {
-    "Data Structures": 4, "DS Lab": 1, "Mathematics III": 4, "Discrete Mathematics": 3,
-    "IT Workshop": 1, "Idea Lab": 2, "Digital Logic Design": 3, "DLD Lab": 1
+    "Data Structures": 4, "DS Lab": 2, "Mathematics III": 3, "Discrete Mathematics": 4,
+    "IT Workshop": 3, "Idea Lab": 0, "Digital Logic Design": 4, "DLD Lab": 1
 }
 GRADE_POINTS = {"A+":10, "A":9, "B+":8, "B":7, "C":6, "D":5, "F":0}
 
@@ -851,4 +851,5 @@ except Exception as e:
             st.toast("Baselines cleared.", icon="📦")
 
     st.markdown("</div>", unsafe_allow_html=True)
+
 
