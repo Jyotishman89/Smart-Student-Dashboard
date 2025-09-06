@@ -1,6 +1,6 @@
 # 🎓 Smart Student Dashboard
 
-A **personal academic dashboard** built with [Streamlit](https://streamlit.io/) to help students track:
+A **personal academic dashboard** built with [Streamlit](https://streamlit.io/) to help me track:
 
 - 📚 Marks across 4 exams (Sessional 1, Mid Term, Sessional 2, End Term)
 - 🧮 SGPA & CGPA (auto-calculated with credit weighting)
@@ -39,12 +39,4 @@ So I built this dashboard to **solve my own problem** and later made it open-sou
 - **Visuals**: Plotly  
 - **Persistence**: CSV (can be extended to databases like SQLite/Postgres)  
 
----
-
-## 🔹 Installation
-Clone the repo and install dependencies:
-```bash
-git clone https://github.com/your-username/Smart-Student-Dashboard.git
-cd Smart-Student-Dashboard
-pip install -r requirements.txt
 
