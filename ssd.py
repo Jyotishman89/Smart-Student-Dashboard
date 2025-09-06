@@ -13,7 +13,7 @@ st.set_page_config(page_title="Student Performance Portal", page_icon="🎓", la
 
 # ===================== CONSTANTS =====================
 PASSWORD = "jyotishman24"  # one-time password (asked only on Home)
-
+# As of now you can put any arbitary number into the ROLL NO. section 
 SUBJECTS = [
     "Data Structures", "DS Lab", "Mathematics III", "Discrete Mathematics",
     "IT Workshop", "Idea Lab", "Digital Logic Design", "DLD Lab"
@@ -851,3 +851,4 @@ except Exception as e:
             st.toast("Baselines cleared.", icon="📦")
 
     st.markdown("</div>", unsafe_allow_html=True)
+
