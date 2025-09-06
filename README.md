@@ -37,6 +37,29 @@ So I built this dashboard to **solve my own problem** and later made it open-sou
 - **Frontend/Backend**: [Streamlit](https://streamlit.io/)  
 - **Data handling**: Pandas, NumPy  
 - **Visuals**: Plotly  
-- **Persistence**: CSV (can be extended to databases like SQLite/Postgres)  
+- **Persistence**: CSV (can be extended to databases like SQLite/Postgres)
+
+---
+## 1️⃣ Clone the repo
+```bash
+git clone https://github.com/Jyotishman89/Smart-Student-Dashboard.git
+cd Smart-Student-Dashboard 
+```
+
+## 2️⃣ Install dependencies
+```bash
+python -m venv .venv
+source .venv/bin/activate   # On Windows: .venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+## 3️⃣ Run the app
+```bash
+streamlit run ssd.py
+```
+
+
+
+
 
 
