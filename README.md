@@ -19,7 +19,7 @@ I wanted **one place** where I could:
 - Know instantly if I could **skip the next class safely**
 - Track **SGPA/CGPA over semesters**
 
-So I built this dashboard to **solve my own problem** and later made it open-source so others can use it too.
+So I built this dashboard to **solve my own problem** and later made it open-source so others can have experience of it too.
 
 ---
 
@@ -57,6 +57,7 @@ pip install -r requirements.txt
 ```bash
 streamlit run ssd.py
 ```
+
 
 
 
