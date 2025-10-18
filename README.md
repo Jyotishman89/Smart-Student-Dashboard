@@ -88,7 +88,7 @@ Here’s a quick overview of my **Smart Student Dashboard** development journey 
 - [ ] Create a walkthrough video or GIF preview
 
 ---
-
+*This dashboard is an ongoing learning project — updates will continue as new features are added!*
 
 
 
