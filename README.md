@@ -57,39 +57,6 @@ pip install -r requirements.txt
 ```bash
 streamlit run ssd.py
 ```
-## ✅ Project Progress
-
-Here’s a quick overview of my **Smart Student Dashboard** development journey and what’s coming next.
-
-### 💻 Core Features
-- [x] Design the initial dashboard layout (responsive & student-friendly)
-- [x] Display key academic metrics (GPA, attendance, course progress)
-- [x] Integrate student performance data (CSV / Database input)
-- [ ] Add GPA trend visualization using Matplotlib / Plotly
-- [ ] Implement login & user authentication system
-- [ ] Enable real-time data refresh for dynamic updates
-
-### 📈 Enhancements
-- [ ] Add personalized study recommendations based on performance
-- [ ] Introduce goal-tracking and productivity analytics
-- [ ] Include comparison charts between semesters
-- [ ] Integrate AI-powered insights (ML model suggestions)
-
-### 🧩 Backend & Data
-- [x] Create sample dataset for testing
-- [ ] Connect with a real database (SQLite / Firebase / PostgreSQL)
-- [ ] Implement CRUD operations for student records
-- [ ] Add secure data handling and validation
-
-### 📘 Documentation
-- [x] Write project overview and goals
-- [ ] Add setup and usage guide
-- [ ] Include sample data and demo screenshots
-- [ ] Create a walkthrough video or GIF preview
-
----
-*This dashboard is an ongoing learning project — updates will continue as new features are added!*
-
 
 
 
