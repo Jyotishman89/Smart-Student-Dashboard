@@ -1,5 +1,7 @@
 # 🎓 Smart Student Dashboard
 
+https://jyotishman89-smart-student-dashboard-ssd-r8odh3.streamlit.app/
+
 A **personal academic dashboard** built with [Streamlit](https://streamlit.io/) to help me track:
 
 - 📚 Marks across 4 exams (Sessional 1, Mid Term, Sessional 2, End Term)
