@@ -70,7 +70,9 @@ This project has been developed solely for **personal use and learning purposes*
 
 It is intended to handle **limited, individual-level data** and is **not optimized for large-scale or multi-user environments**. 
 
-Please note that **data security and authentication mechanisms are minimal** in this version, as the focus is primarily on functionality and design rather than robust security implementation.Future updates may include improved scalability and enhanced security features.
+Please note that **data security and authentication mechanisms are minimal** in this version, as the focus is primarily on functionality and design rather than robust security implementation.
+
+Future updates may include improved scalability and enhanced security features.
 
 
 ---
