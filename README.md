@@ -25,13 +25,17 @@ So I built this dashboard to **solve my own problem** and later made it open-sou
 
 ---
 
+*Note: This project was built for personal use and learning purposes. It’s not optimized for large-scale data or advanced security.*
+
+---
+
 ##  Features
-✅ Secure login with Roll No. and password  
-✅ Dynamic animated charts (bar, pie, line)  
-✅ Attendance predictor (skip vs attend advice)  
-✅ SGPA & CGPA calculation (with credit weighting)  
-✅ Save and restore snapshots across semesters  
-✅ Dark theme, glassmorphism UI  
+● Secure login with Roll No. and password  
+● Dynamic animated charts (bar, pie, line)  
+● Attendance predictor (skip vs attend advice)  
+● SGPA & CGPA calculation (with credit weighting)  
+● Save and restore snapshots across semesters  
+● Dark theme, glassmorphism UI  
 
 ---
 
@@ -61,6 +65,16 @@ streamlit run ssd.py
 ```
 ---
 
+##  Disclaimer
+This project has been developed solely for **personal use and learning purposes**.
+
+It is intended to handle **limited, individual-level data** and is **not optimized for large-scale or multi-user environments**. 
+
+Please note that **data security and authentication mechanisms are minimal** in this version, as the focus is primarily on functionality and design rather than robust security implementation.  
+Future updates may include improved scalability and enhanced security features.
+
+
+---
 
 
 
