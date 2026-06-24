@@ -31,15 +31,16 @@ DEFAULT_COMPONENTS: list[tuple[str, float]] = [
     ("End Term", 50),
 ]
 
-# Grade -> grade point mapping used for SGPA/CGPA.
+# Grade -> grade point mapping used for SGPA/CGPA (10-point scale, O = 10).
 GRADE_POINTS: dict[str, int] = {
-    "A+": 10, "A": 9, "B+": 8, "B": 7, "C": 6, "D": 5, "F": 0,
+    "O": 10, "A+": 9, "A": 8, "B+": 7, "B": 6, "C": 5, "P": 4, "F": 0,
 }
 
 # Grade boundaries expressed as *percentage* of the maximum (so they stay
-# correct even when component weightage is customised). Ordered high -> low.
+# correct even when component weightage is customised). Ordered high -> low;
+# a grade is awarded when percentage >= its cutoff. O requires a perfect 100%.
 GRADE_BANDS: list[tuple[float, str]] = [
-    (90, "A+"), (80, "A"), (70, "B+"), (60, "B"), (50, "C"), (40, "D"),
+    (100, "O"), (90, "A+"), (80, "A"), (70, "B+"), (60, "B"), (50, "C"), (40, "P"),
 ]
 
 PASS_PERCENT = 40.0       # pass mark as a percentage
