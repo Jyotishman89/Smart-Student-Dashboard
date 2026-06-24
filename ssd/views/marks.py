@@ -19,7 +19,7 @@ def render() -> None:
 
     st.subheader("📚 Marks & Exams")
     if not state["subjects"]:
-        st.info("No subjects yet. Add some in **⚙️ Settings**.")
+        st.info("No subjects yet.")
         return
 
     top = st.columns([1, 2])
@@ -28,7 +28,7 @@ def render() -> None:
     with top[1]:
         st.caption(f"Pass line at {PASS_PERCENT:g}% • Target line at {TARGET_PERCENT:g}%. "
                    "Edit marks or rename a subject in the grid below — changes save "
-                   "automatically. (Add/remove subjects in ⚙️ Settings.)")
+                   "automatically.")
 
     # ----- editable grid (rename subjects inline + edit marks) -----
     df = c.marks_dataframe(state)

@@ -23,7 +23,7 @@ def render() -> None:
 
     st.subheader("🕒 Attendance Tracker")
     if not state["subjects"]:
-        st.info("No subjects yet. Add some in **⚙️ Settings**.")
+        st.info("No subjects yet.")
         return
 
     top = st.columns([1, 2])
