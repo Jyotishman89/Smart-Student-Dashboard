@@ -12,6 +12,40 @@ from ..db import session_scope
 from . import _common as c
 
 
+def _persist_marks_edits(sid: int, subjects: list[dict], comp_names: set[str]) -> None:
+    """Write the data-editor's pending edits to the DB *before* the page reruns.
+
+    Streamlit fires ``on_change`` callbacks ahead of the script rerun, so saving
+    here — rather than after the grid renders — keeps the grid from lagging a
+    step behind what was typed (which made edits look like they didn't take).
+    """
+    delta = st.session_state.get("marks_editor", {})
+    edited_rows = delta.get("edited_rows", {})
+    if not edited_rows:
+        return
+    name_updates: dict[int, str] = {}
+    score_updates: dict[int, dict[str, float]] = {}
+    for idx, changes in edited_rows.items():
+        i = int(idx)
+        if i >= len(subjects):
+            continue
+        subj_id = subjects[i]["id"]
+        for col, val in changes.items():
+            if col == "Subject":
+                new_name = ("" if val is None else str(val)).strip()
+                if new_name:
+                    name_updates[subj_id] = new_name
+            elif col in comp_names:
+                score_updates.setdefault(subj_id, {})[col] = 0.0 if val is None else float(val)
+    if not (name_updates or score_updates):
+        return
+    with session_scope() as session:
+        if name_updates:
+            repo.rename_subjects(session, sid, name_updates)
+        if score_updates:
+            repo.save_scores(session, sid, score_updates)
+
+
 def render() -> None:
     uid = c.require_user()
     sid = c.current_semester_id(uid)
@@ -40,29 +74,14 @@ def render() -> None:
             f"{comp['name']} ({comp['max_marks']:g})",
             min_value=0.0, max_value=float(comp["max_marks"]), step=0.5,
         )
-    edited = st.data_editor(
+    # Edits persist via the on_change callback (runs before the rerun), so by the
+    # time this script body runs again `state` already reflects the latest edit.
+    st.data_editor(
         df, hide_index=True, use_container_width=True, num_rows="fixed",
         column_config=col_cfg, key="marks_editor",
+        on_change=_persist_marks_edits,
+        args=(sid, state["subjects"], {cc["name"] for cc in state["components"]}),
     )
-
-    # ----- persist only when something actually changed (fixes constant-write bug) -----
-    comp_names = [comp["name"] for comp in state["components"]]
-    name_updates: dict[int, str] = {}
-    score_updates: dict[int, dict[str, float]] = {}
-    for subj, (_, row) in zip(state["subjects"], edited.iterrows(), strict=False):
-        new_name = "" if pd.isna(row["Subject"]) else str(row["Subject"]).strip()
-        if new_name and new_name != subj["name"]:
-            name_updates[subj["id"]] = new_name
-        score_updates[subj["id"]] = {cn: float(row[cn]) for cn in comp_names}
-
-    scores_changed = not edited[comp_names].equals(df[comp_names])
-    if name_updates or scores_changed:
-        with session_scope() as session:
-            if name_updates:
-                repo.rename_subjects(session, sid, name_updates)
-            if scores_changed:
-                repo.save_scores(session, sid, score_updates)
-        state = c.load_state(sid)  # reload renamed/clamped values
 
     summary = repo.summarize_state(state)
     rows = pd.DataFrame(summary["rows"])

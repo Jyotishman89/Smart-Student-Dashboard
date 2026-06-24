@@ -12,8 +12,29 @@ from . import _common as c
 
 
 def _cell_int(value) -> int:
-    """A cleared data-editor cell comes back as NaN; treat it as 0."""
-    return 0 if pd.isna(value) else int(value)
+    """A cleared data-editor cell comes back as NaN/None; treat it as 0."""
+    return 0 if value is None or pd.isna(value) else int(value)
+
+
+def _persist_attendance_edits(subjects: list[dict]) -> None:
+    """Persist the editor's pending edits before the rerun (avoids the one-step
+    lag that made edits look like they didn't take)."""
+    delta = st.session_state.get("att_editor", {})
+    edited_rows = delta.get("edited_rows", {})
+    if not edited_rows:
+        return
+    updates: dict[int, tuple[int, int]] = {}
+    for idx, changes in edited_rows.items():
+        i = int(idx)
+        if i >= len(subjects):
+            continue
+        subj = subjects[i]
+        held = changes.get("Classes Held", subj["attendance"]["held"])
+        attended = changes.get("Classes Attended", subj["attendance"]["attended"])
+        updates[subj["id"]] = (_cell_int(held), _cell_int(attended))
+    if updates:
+        with session_scope() as session:
+            repo.save_attendance(session, updates)
 
 
 def render() -> None:
@@ -34,7 +55,7 @@ def render() -> None:
                    "Edit the grid below — changes save automatically.")
 
     df = c.attendance_dataframe(state)
-    edited = st.data_editor(
+    st.data_editor(
         df, hide_index=True, use_container_width=True, num_rows="fixed",
         column_config={
             "Subject": st.column_config.TextColumn("Subject", disabled=True),
@@ -43,18 +64,9 @@ def render() -> None:
                                                               min_value=0, step=1),
         },
         key="att_editor",
+        on_change=_persist_attendance_edits,
+        args=(state["subjects"],),
     )
-
-    if not edited[["Classes Held", "Classes Attended"]].equals(
-        df[["Classes Held", "Classes Attended"]]
-    ):
-        updates = {}
-        for subj, (_, row) in zip(state["subjects"], edited.iterrows(), strict=False):
-            updates[subj["id"]] = (_cell_int(row["Classes Held"]),
-                                   _cell_int(row["Classes Attended"]))
-        with session_scope() as session:
-            repo.save_attendance(session, updates)
-        state = c.load_state(sid)
 
     # ----- compute advice -----
     records = []
