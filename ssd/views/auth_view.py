@@ -15,8 +15,19 @@ def render() -> None:
     )
     st.write("")
 
-    _, mid, _ = st.columns([1, 1.4, 1])
-    with mid:
+    left, right = st.columns([1.05, 1], gap="large")
+    with left:
+        with st.container(border=True):
+            st.markdown("#### Why you'll like it")
+            st.markdown(
+                "- 🔐 **Private accounts** — your data is yours, bcrypt-secured.\n"
+                "- 📚 **Live grades** — edit marks and watch grades & SGPA update.\n"
+                "- 🕒 **Attendance advice** — know if you can skip the next class.\n"
+                "- 📈 **CGPA timeline** — snapshot each semester and track trends."
+            )
+            st.caption("🔒 Passwords are hashed with bcrypt and never stored in plain text.")
+
+    with right:
         with st.container(border=True):
             login_tab, signup_tab = st.tabs(["🔐 Log in", "✨ Create account"])
 
@@ -50,5 +61,3 @@ def render() -> None:
                         st.success(msg + " Switch to the **Log in** tab.")
                     else:
                         st.error(msg)
-
-    st.caption("Your password is hashed with bcrypt and never stored in plain text.")
