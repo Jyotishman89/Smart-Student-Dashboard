@@ -1,4 +1,4 @@
-# 🎓 Smart Student Dashboard
+# Smart Student Dashboard
 
 A **multi-user academic dashboard** built with [Streamlit](https://streamlit.io/) and
 PostgreSQL. Track marks, attendance, SGPA and CGPA — securely, across semesters.
@@ -9,19 +9,19 @@ PostgreSQL. Track marks, attendance, SGPA and CGPA — securely, across semester
 
 ---
 
-## ✨ Features
+## Features
 
-- 🔐 **Real accounts** — sign up with your name, **roll number** and email; then **log in with your roll number + password** (hashed with **bcrypt**). Each user's data is private.
-- 🗄️ **Cloud database** — PostgreSQL (Neon). Data persists across redeploys (the old CSV version lost data on every restart).
-- 📚 **Marks & grades** — editable grid, live grade/percentage, pass/fail and performance alerts.
-- 🕒 **Attendance** — per-subject tracking with skip-vs-attend advice for the next class.
-- 📈 **SGPA / CGPA** — credit-weighted, exact decimal rounding; **snapshots** build your CGPA timeline.
-- ⚙️ **Fully customisable** — add/remove subjects, set credits, and define your own exam weightage per semester.
-- 🎨 Dark, glassmorphism UI with clean Plotly charts.
+- **Real accounts** — sign up with your name, **roll number** and email; then **log in with your roll number + password** (hashed with **bcrypt**). Each user's data is private.
+- **Cloud database** — PostgreSQL (Neon). Data persists across redeploys.
+- **Marks & grades** — editable grid, live grade/percentage, pass/fail and performance alerts.
+- **Attendance** — per-subject tracking with skip-vs-attend advice for the next class.
+- **SGPA / CGPA** — credit-weighted, exact decimal rounding; **snapshots** build your CGPA timeline.
+- **Fully customisable** — add/remove subjects, set credits, and define your own exam weightage per semester.
+- Dark, glassmorphism UI with clean Plotly charts.
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 ssd.py                 # thin Streamlit entrypoint -> ssd.main.run()
@@ -46,7 +46,7 @@ The calculation layer (`academics.py`) has **no Streamlit or DB imports**, which
 
 ---
 
-## 🚀 Local setup
+## Local setup
 
 ```bash
 git clone https://github.com/Jyotishman89/Smart-Student-Dashboard.git
@@ -83,7 +83,7 @@ streamlit run ssd.py
 
 ---
 
-## 🧪 Tests & lint
+## Tests & lint
 
 ```bash
 pytest -q          # unit + repository tests
@@ -94,7 +94,7 @@ CI runs both on every push/PR (`.github/workflows/ci.yml`).
 
 ---
 
-## 🗃️ Migrating old CSV data
+## Migrating old CSV data
 
 ```bash
 python scripts/migrate_csv.py --dry-run     # preview
@@ -113,7 +113,7 @@ Migrated accounts use a placeholder password (`ChangeMe123!`) — reset it after
 
 ---
 
-## 🔭 Future work
+## Future work
 
 - Email verification & password reset
 - Per-user theme preferences
