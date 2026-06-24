@@ -121,7 +121,7 @@ Migrated accounts use a placeholder password (`ChangeMe123!`) — reset it after
 
 ---
 
-## 📜 Disclaimer
+## Disclaimer
 
 Built for learning. Passwords are bcrypt-hashed and data is per-user isolated, but this is a
 student project — review security before using it with sensitive data at scale.
