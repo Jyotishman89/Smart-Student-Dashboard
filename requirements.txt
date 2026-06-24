@@ -1,4 +1,8 @@
-streamlit
+streamlit>=1.36
 pandas
 numpy
 plotly
+SQLAlchemy>=2.0
+psycopg2-binary
+bcrypt
+extra-streamlit-components
