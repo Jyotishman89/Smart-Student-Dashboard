@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -71,9 +71,41 @@ def session_scope() -> Iterator[Session]:
         session.close()
 
 
+# Columns added to existing models after the first release. ``create_all`` only
+# creates *missing tables* — it never alters an existing one — so deployed
+# databases (Neon, a dev app.db) need these added explicitly.
+_ADDITIVE_COLUMNS: dict[str, list[tuple[str, str]]] = {
+    "semesters": [("sgpa_override", "FLOAT")],
+    "users": [("cgpa_override", "FLOAT")],
+}
+
+
+def ensure_schema(engine: Engine | None = None) -> None:
+    """Add any missing additive columns via ``ALTER TABLE`` (idempotent).
+
+    Lets a running database self-migrate on startup: brand-new tables already
+    have the columns (from ``create_all``); older ones get them added here.
+    """
+    engine = engine or get_engine()
+    inspector = inspect(engine)
+    for table, columns in _ADDITIVE_COLUMNS.items():
+        if not inspector.has_table(table):
+            continue
+        existing = {c["name"] for c in inspector.get_columns(table)}
+        for name, sqltype in columns:
+            if name in existing:
+                continue
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {sqltype}"))
+            except Exception:
+                pass  # raced with another worker that already added it — fine
+
+
 def init_db() -> None:
-    """Create all tables if they do not yet exist (idempotent)."""
+    """Create missing tables and add any new columns (idempotent)."""
     Base.metadata.create_all(get_engine())
+    ensure_schema()
 
 
 def reset_engine() -> None:

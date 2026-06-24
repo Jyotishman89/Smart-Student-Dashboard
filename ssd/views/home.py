@@ -26,15 +26,17 @@ def render() -> None:
     st.write("")
 
     with session_scope() as session:
-        cgpa_val, cgpa_credits = repo.cgpa_for_user(session, uid)
+        cgpa_val, cgpa_credits, cgpa_manual = repo.cgpa_for_user(session, uid)
 
     percents = [r["Percent"] for r in summary["rows"]]
     att_vals = [academics.att_percent(s["attendance"]["held"], s["attendance"]["attended"])
                 for s in state["subjects"]]
 
     k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Current SGPA", f"{academics.round_2dp(summary['sgpa'])}")
-    k2.metric("CGPA", f"{academics.round_2dp(cgpa_val)}")
+    k1.metric("Current SGPA", f"{academics.round_2dp(summary['sgpa_effective'])}",
+              help="Set manually in Settings." if summary["sgpa_is_manual"] else None)
+    k2.metric("CGPA", f"{academics.round_2dp(cgpa_val)}",
+              help="Set manually in Settings." if cgpa_manual else None)
     k3.metric("Average %", f"{np.mean(percents):.1f}" if percents else "0.0")
     k4.metric("Avg Attendance", f"{np.mean(att_vals):.0f}%" if att_vals else "0%")
 

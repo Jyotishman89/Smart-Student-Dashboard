@@ -47,6 +47,21 @@ def test_save_attendance_clamps_attended_to_held(session):
     assert state2["subjects"][0]["attendance"] == {"held": 10, "attended": 10}
 
 
+def test_save_attendance_keeps_attended_when_held_zero(session):
+    # Bug: entering "attended" on a fresh row (held=0) used to clamp it to 0,
+    # making the edit vanish. It must now survive until "held" is set.
+    user = _make_user(session)
+    sem = repo.get_active_semester(session, user.id)
+    subj = repo.get_state(session, sem.id)["subjects"][0]
+    repo.save_attendance(session, {subj["id"]: (0, 18)})
+    att = repo.get_state(session, sem.id)["subjects"][0]["attendance"]
+    assert att == {"held": 0, "attended": 18}
+    # once held is set, the normal cap applies again
+    repo.save_attendance(session, {subj["id"]: (20, 18)})
+    att = repo.get_state(session, sem.id)["subjects"][0]["attendance"]
+    assert att == {"held": 20, "attended": 18}
+
+
 def test_set_subjects_add_and_remove(session):
     user = _make_user(session)
     sem = repo.get_active_semester(session, user.id)
@@ -114,9 +129,10 @@ def test_snapshot_restore_and_cgpa(session):
     snaps = repo.list_snapshots(session, user.id)
     assert len(snaps) == 1
 
-    cgpa_val, credits = repo.cgpa_for_user(session, user.id)
+    cgpa_val, credits, manual = repo.cgpa_for_user(session, user.id)
     assert credits > 0
     assert float(cgpa_val) > 0
+    assert manual is False
 
     # wipe the score, then restore the snapshot and confirm it came back
     repo.save_scores(session, sem.id, {sid0: {"Sessional 1": 0, "Mid Term": 0,
@@ -126,3 +142,63 @@ def test_snapshot_restore_and_cgpa(session):
     first = next(s for s in restored["subjects"] if s["id"] == sid0 or s["name"] ==
                  state["subjects"][0]["name"])
     assert first["scores"]["End Term"] == 50.0
+
+
+def test_sgpa_override(session):
+    user = _make_user(session)
+    sem = repo.get_active_semester(session, user.id)
+
+    summ = repo.summarize_state(repo.get_state(session, sem.id))
+    assert summ["sgpa_is_manual"] is False  # auto by default
+
+    repo.set_sgpa_override(session, sem.id, 9.5)
+    summ = repo.summarize_state(repo.get_state(session, sem.id))
+    assert summ["sgpa_is_manual"] is True
+    assert float(summ["sgpa_effective"]) == 9.5
+    # a snapshot records the override value (so CGPA reflects it)
+    snap = repo.create_snapshot(session, user.id, sem.id)
+    assert float(snap.sgpa) == 9.5
+
+    repo.set_sgpa_override(session, sem.id, None)  # clear -> back to auto
+    summ = repo.summarize_state(repo.get_state(session, sem.id))
+    assert summ["sgpa_is_manual"] is False
+
+
+def test_cgpa_override(session):
+    user = _make_user(session)
+    repo.set_cgpa_override(session, user.id, 8.25)
+    value, _credits, manual = repo.cgpa_for_user(session, user.id)
+    assert manual is True
+    assert float(value) == 8.25
+
+    repo.set_cgpa_override(session, user.id, None)
+    _value, _credits, manual = repo.cgpa_for_user(session, user.id)
+    assert manual is False
+
+
+def test_ensure_schema_adds_missing_columns():
+    import os
+    import tempfile
+
+    from sqlalchemy import create_engine, inspect, text
+
+    from ssd import db
+
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    eng = create_engine(f"sqlite:///{path}")
+    # simulate an older database without the override columns
+    with eng.begin() as conn:
+        conn.execute(text("CREATE TABLE semesters (id INTEGER PRIMARY KEY, label TEXT)"))
+        conn.execute(text("CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT)"))
+
+    db.ensure_schema(eng)
+    db.ensure_schema(eng)  # idempotent — second run must not error
+
+    sem_cols = {c["name"] for c in inspect(eng).get_columns("semesters")}
+    user_cols = {c["name"] for c in inspect(eng).get_columns("users")}
+    assert "sgpa_override" in sem_cols
+    assert "cgpa_override" in user_cols
+
+    eng.dispose()
+    os.remove(path)

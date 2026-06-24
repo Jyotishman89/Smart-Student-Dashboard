@@ -34,6 +34,8 @@ class User(Base):
     # Roll number is the login identifier — unique + indexed.
     roll_no: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    # Optional manual override for the displayed CGPA (None = auto-calculate).
+    cgpa_override: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
 
     semesters: Mapped[list[Semester]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
@@ -51,6 +53,8 @@ class Semester(Base):
     label: Mapped[str] = mapped_column(String(64), default="Sem-1")
     is_active: Mapped[bool] = mapped_column(default=False)
     perf_threshold: Mapped[float] = mapped_column(Float, default=50.0)
+    # Optional manual override for this semester's SGPA (None = auto-calculate).
+    sgpa_override: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     user: Mapped[User] = relationship(back_populates="semesters")

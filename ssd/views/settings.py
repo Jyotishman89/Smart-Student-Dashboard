@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from .. import auth
+from .. import academics, auth
 from .. import repository as repo
 from ..db import session_scope
 from . import _common as c
@@ -23,6 +23,8 @@ def render() -> None:
     _components_section(uid, sid, state)
     st.divider()
     _threshold_section(uid, sid, state)
+    st.divider()
+    _grades_section(uid, sid, state)
     st.divider()
     _account_section(uid)
 
@@ -132,6 +134,43 @@ def _threshold_section(uid: int, sid: int, state: dict) -> None:
             with session_scope() as session:
                 repo.update_semester_meta(session, sid, perf_threshold=float(value))
             st.toast(f"Threshold set to {value}%.", icon="🚩")
+
+
+# ------------------------------------------------------------ sgpa / cgpa -----
+def _grades_section(uid: int, sid: int, state: dict) -> None:
+    with st.container(border=True):
+        st.markdown("##### 🎯 SGPA / CGPA")
+        st.caption("Both are calculated from your marks by default. Tick a box to type "
+                   "your own value instead (e.g. your official university result).")
+
+        auto_sgpa = float(academics.round_2dp(repo.summarize_state(state)["sgpa"]))
+        cur_sgpa = state["semester"].get("sgpa_override")
+        with session_scope() as session:
+            user = repo.get_user(session, uid)
+            cur_cgpa = user.cgpa_override if user else None
+
+        with st.form("override_form"):
+            st.markdown(f"**SGPA — {state['semester']['label']}**  "
+                        f"_(auto-calculated: {auto_sgpa:.2f})_")
+            man_s = st.checkbox("Enter SGPA manually", value=cur_sgpa is not None)
+            sgpa_in = st.number_input(
+                "Your SGPA", min_value=0.0, max_value=10.0, step=0.01,
+                value=float(cur_sgpa) if cur_sgpa is not None else auto_sgpa,
+            )
+            st.divider()
+            st.markdown("**CGPA — overall**")
+            man_c = st.checkbox("Enter CGPA manually", value=cur_cgpa is not None)
+            cgpa_in = st.number_input(
+                "Your CGPA", min_value=0.0, max_value=10.0, step=0.01,
+                value=float(cur_cgpa) if cur_cgpa is not None else 0.0,
+            )
+            submitted = st.form_submit_button("Save SGPA / CGPA", type="primary")
+        if submitted:
+            with session_scope() as session:
+                repo.set_sgpa_override(session, sid, round(sgpa_in, 2) if man_s else None)
+                repo.set_cgpa_override(session, uid, round(cgpa_in, 2) if man_c else None)
+            st.toast("SGPA / CGPA settings saved.", icon="🎯")
+            st.rerun()
 
 
 # ----------------------------------------------------------------- account ----

@@ -30,12 +30,14 @@ def render() -> None:
     st.subheader("📈 History & CGPA")
 
     with session_scope() as session:
-        cgpa_val, cgpa_credits = repo.cgpa_for_user(session, uid)
+        cgpa_val, cgpa_credits, cgpa_manual = repo.cgpa_for_user(session, uid)
 
     k = st.columns(3)
-    k[0].metric("Current SGPA", f"{academics.round_2dp(summary['sgpa'])}")
+    k[0].metric("Current SGPA", f"{academics.round_2dp(summary['sgpa_effective'])}",
+                help="Set manually in Settings." if summary["sgpa_is_manual"] else None)
     k[1].metric("Semester Credits", f"{summary['total_credits']:.0f}")
-    k[2].metric("CGPA (latest per semester)", f"{academics.round_2dp(cgpa_val)}")
+    k[2].metric("CGPA (latest per semester)", f"{academics.round_2dp(cgpa_val)}",
+                help="Set manually in Settings." if cgpa_manual else None)
 
     # ----- actions -----
     a1, a2 = st.columns([1, 2])

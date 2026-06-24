@@ -16,6 +16,7 @@ A "state" dict is the canonical shape passed around the UI::
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import func, select
@@ -222,6 +223,7 @@ def get_state(session: Session, semester_id: int) -> dict[str, Any]:
         "semester": {
             "id": sem.id, "label": sem.label,
             "perf_threshold": sem.perf_threshold, "is_active": sem.is_active,
+            "sgpa_override": sem.sgpa_override,
         },
         "components": [
             {"id": c.id, "name": c.name, "max_marks": c.max_marks, "order_index": c.order_index}
@@ -271,10 +273,18 @@ def save_scores(session: Session, semester_id: int,
 
 
 def save_attendance(session: Session, updates: dict[int, tuple[int, int]]) -> None:
-    """updates = {subject_id: (held, attended)} with attended clamped to held."""
+    """updates = {subject_id: (held, attended)}.
+
+    Both are floored at 0. ``attended`` is capped at ``held`` only when classes
+    have actually been held — capping against ``held == 0`` would silently wipe
+    an "attended" value typed on a fresh row before its "held" was set (the
+    attendance percentage already guards the ratio at display time).
+    """
     for subject_id, (held, attended) in updates.items():
         held = max(0, int(held))
-        attended = max(0, min(int(attended), held))
+        attended = max(0, int(attended))
+        if held > 0:
+            attended = min(attended, held)
         att = session.scalar(select(Attendance).where(Attendance.subject_id == subject_id))
         if att is None:
             session.add(Attendance(subject_id=subject_id, classes_held=held,
@@ -377,7 +387,19 @@ def summarize_state(state: dict[str, Any]) -> dict[str, Any]:
         })
         grade_credits.append((grade, s["credits"]))
     sgpa_val, total_credits = academics.sgpa(grade_credits)
-    return {"rows": rows, "sgpa": sgpa_val, "total_credits": total_credits, "max_total": maximum}
+    # A manual SGPA override (if set on the semester) wins over the calculation.
+    override = state["semester"].get("sgpa_override")
+    if override is not None:
+        sgpa_effective: Decimal = Decimal(str(override))
+        sgpa_is_manual = True
+    else:
+        sgpa_effective = sgpa_val
+        sgpa_is_manual = False
+    return {
+        "rows": rows, "sgpa": sgpa_val,
+        "sgpa_effective": sgpa_effective, "sgpa_is_manual": sgpa_is_manual,
+        "total_credits": total_credits, "max_total": maximum,
+    }
 
 
 # ============================================================ snapshots =======
@@ -408,7 +430,7 @@ def create_snapshot(session: Session, user_id: int, semester_id: int) -> Snapsho
         semester_id=semester_id,
         semester_label=state["semester"]["label"],
         taken_at=datetime.now(),
-        sgpa=float(summary["sgpa"]),
+        sgpa=float(summary["sgpa_effective"]),  # honour a manual override
         total_credits=float(summary["total_credits"]),
         payload=_state_to_payload(state),
     )
@@ -452,14 +474,36 @@ def restore_snapshot(session: Session, semester_id: int, snapshot_id: int) -> No
     save_attendance(session, att_updates)
 
 
-def cgpa_for_user(session: Session, user_id: int) -> tuple[Any, float]:
-    """CGPA from the latest snapshot per semester label."""
+def cgpa_for_user(session: Session, user_id: int) -> tuple[Any, float, bool]:
+    """CGPA for a user → (value, total_credits, is_manual).
+
+    A manual override on the user wins; otherwise it is the credit-weighted
+    average of the latest snapshot per semester label.
+    """
     snaps = list_snapshots(session, user_id)
     latest: dict[str, Snapshot] = {}
     for snap in snaps:  # already newest-first
         latest.setdefault(snap.semester_label, snap)
     results = [(s.sgpa, s.total_credits) for s in latest.values()]
-    return academics.cgpa(results)
+    value, credits = academics.cgpa(results)
+    user = session.get(User, user_id)
+    if user is not None and user.cgpa_override is not None:
+        return Decimal(str(user.cgpa_override)), credits, True
+    return value, credits, False
+
+
+def set_sgpa_override(session: Session, semester_id: int, value: float | None) -> None:
+    """Set (or clear, with ``None``) a semester's manual SGPA."""
+    sem = session.get(Semester, semester_id)
+    if sem is not None:
+        sem.sgpa_override = None if value is None else float(value)
+
+
+def set_cgpa_override(session: Session, user_id: int, value: float | None) -> None:
+    """Set (or clear, with ``None``) a user's manual CGPA."""
+    user = session.get(User, user_id)
+    if user is not None:
+        user.cgpa_override = None if value is None else float(value)
 
 
 # ---- convenience wrappers that open their own session (used by views) --------
