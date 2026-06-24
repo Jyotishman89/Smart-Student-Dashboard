@@ -11,6 +11,11 @@ from ..db import session_scope
 from . import _common as c
 
 
+def _cell_int(value) -> int:
+    """A cleared data-editor cell comes back as NaN; treat it as 0."""
+    return 0 if pd.isna(value) else int(value)
+
+
 def render() -> None:
     uid = c.require_user()
     sid = c.current_semester_id(uid)
@@ -45,7 +50,8 @@ def render() -> None:
     ):
         updates = {}
         for subj, (_, row) in zip(state["subjects"], edited.iterrows(), strict=False):
-            updates[subj["id"]] = (int(row["Classes Held"]), int(row["Classes Attended"]))
+            updates[subj["id"]] = (_cell_int(row["Classes Held"]),
+                                   _cell_int(row["Classes Attended"]))
         with session_scope() as session:
             repo.save_attendance(session, updates)
         state = c.load_state(sid)

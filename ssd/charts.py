@@ -3,7 +3,8 @@
 These are intentionally lightweight static figures. The original app rebuilt
 60-frame client-side animations on every Streamlit rerun, which was heavy and
 flickery; a clean static chart with hover detail performs far better and reads
-just as well. Plotly's own transition easing gives a subtle animated update.
+just as well. Charts update instantly with no transition/animation delay so the
+grid edits feel immediate.
 """
 from __future__ import annotations
 
@@ -20,7 +21,7 @@ def _layout(title: str, y_max: float | None = None, shapes=None) -> dict:
         height=420,
         margin=dict(l=10, r=10, t=46, b=10),
         xaxis=dict(tickangle=20),
-        transition=dict(duration=350, easing="cubic-in-out"),
+        transition=dict(duration=0),  # no animation/transition delay — instant update
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
     )
