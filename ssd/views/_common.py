@@ -20,13 +20,17 @@ def require_user() -> int:
 
 
 def current_semester_id(user_id: int) -> int:
-    """Resolve the active semester id, honouring the sidebar selection."""
+    """Resolve the active semester id, honouring the sidebar selection.
+
+    The sidebar runs before every page and stores a validated
+    ``active_semester_id`` in session state (it self-heals if the stored id is
+    gone), so trust it when present and skip a redundant DB round-trip. Only
+    query on the rare path where it is unset.
+    """
     sid = st.session_state.get("active_semester_id")
+    if sid is not None:
+        return sid
     with session_scope() as session:
-        sems = repo.list_semesters(session, user_id)
-        valid_ids = {s.id for s in sems}
-        if sid in valid_ids:
-            return sid
         active = repo.get_active_semester(session, user_id)
         st.session_state.active_semester_id = active.id
         return active.id

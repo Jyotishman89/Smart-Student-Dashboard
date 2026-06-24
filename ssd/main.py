@@ -10,6 +10,18 @@ from .theme import configure_page
 from .views import attendance, auth_view, history, home, marks, settings
 
 
+@st.cache_resource(show_spinner=False)
+def _db_ready() -> bool:
+    """Ensure tables exist — once per server process.
+
+    ``init_db()`` issues table-reflection queries; calling it on every rerun
+    cost a round-trip to the remote (Neon) database on each interaction, which
+    showed up as lag. Caching makes it a one-time startup cost.
+    """
+    init_db()
+    return True
+
+
 def _sidebar(user_id: int) -> None:
     with st.sidebar:
         st.markdown(f"### 👋 {st.session_state.get('user_name', 'Student')}")
@@ -39,7 +51,7 @@ def _sidebar(user_id: int) -> None:
 
 def run() -> None:
     configure_page()
-    init_db()  # idempotent; safe on every start
+    _db_ready()  # tables created once per process, not on every rerun
 
     user_id = auth.restore_session()
     if not user_id:
