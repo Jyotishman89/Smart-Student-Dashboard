@@ -63,6 +63,24 @@ def test_set_subjects_add_and_remove(session):
         assert set(subj["scores"].keys()) == comp_names
 
 
+def test_rename_subjects_keeps_credits_and_scores(session):
+    user = _make_user(session)
+    sem = repo.get_active_semester(session, user.id)
+    state = repo.get_state(session, sem.id)
+    subj = state["subjects"][0]
+    repo.save_scores(session, sem.id, {subj["id"]: {"Sessional 1": 7}})
+
+    # rename trims whitespace; blank names and unknown ids are ignored
+    repo.rename_subjects(session, sem.id, {subj["id"]: "  Renamed  ", 999999: "ghost"})
+    repo.rename_subjects(session, sem.id, {subj["id"]: "   "})
+
+    state2 = repo.get_state(session, sem.id)
+    renamed = next(s for s in state2["subjects"] if s["id"] == subj["id"])
+    assert renamed["name"] == "Renamed"
+    assert renamed["credits"] == subj["credits"]
+    assert renamed["scores"]["Sessional 1"] == 7.0
+
+
 def test_set_components_reclamps_scores(session):
     user = _make_user(session)
     sem = repo.get_active_semester(session, user.id)

@@ -314,6 +314,22 @@ def set_subjects(session: Session, semester_id: int,
     _ensure_score_grid(session, semester_id)
 
 
+def rename_subjects(session: Session, semester_id: int, names: dict[int, str]) -> None:
+    """Rename existing subjects by id (inline editing on the Marks tab).
+
+    Unlike ``set_subjects`` this only touches the name — credits, scores and
+    attendance are left untouched, and blank names are ignored.
+    """
+    if session.get(Semester, semester_id) is None:
+        return
+    by_id = {s.id: s for s in _subjects(session, semester_id)}
+    for subject_id, new_name in names.items():
+        subj = by_id.get(subject_id)
+        clean = str(new_name).strip()
+        if subj is not None and clean:
+            subj.name = clean
+
+
 def set_components(session: Session, semester_id: int,
                    rows: list[dict[str, Any]]) -> None:
     """Reconcile the component list. Each row: {id?, name, max_marks, order_index?}."""

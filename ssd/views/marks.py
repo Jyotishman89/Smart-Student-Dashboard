@@ -27,11 +27,14 @@ def render() -> None:
         chart_kind = c.chart_type("marks_chart_type")
     with top[1]:
         st.caption(f"Pass line at {PASS_PERCENT:g}% • Target line at {TARGET_PERCENT:g}%. "
-                   "Edit the grid below — changes save automatically.")
+                   "Edit marks or rename a subject in the grid below — changes save "
+                   "automatically. (Add/remove subjects in ⚙️ Settings.)")
 
-    # ----- editable grid -----
+    # ----- editable grid (rename subjects inline + edit marks) -----
     df = c.marks_dataframe(state)
-    col_cfg = {"Subject": st.column_config.TextColumn("Subject", disabled=True)}
+    col_cfg = {"Subject": st.column_config.TextColumn(
+        "Subject", required=True, help="Rename a subject by editing it here."
+    )}
     for comp in state["components"]:
         col_cfg[comp["name"]] = st.column_config.NumberColumn(
             f"{comp['name']} ({comp['max_marks']:g})",
@@ -44,13 +47,22 @@ def render() -> None:
 
     # ----- persist only when something actually changed (fixes constant-write bug) -----
     comp_names = [comp["name"] for comp in state["components"]]
-    if not edited[comp_names].equals(df[comp_names]):
-        updates = {}
-        for subj, (_, row) in zip(state["subjects"], edited.iterrows(), strict=False):
-            updates[subj["id"]] = {cn: float(row[cn]) for cn in comp_names}
+    name_updates: dict[int, str] = {}
+    score_updates: dict[int, dict[str, float]] = {}
+    for subj, (_, row) in zip(state["subjects"], edited.iterrows(), strict=False):
+        new_name = "" if pd.isna(row["Subject"]) else str(row["Subject"]).strip()
+        if new_name and new_name != subj["name"]:
+            name_updates[subj["id"]] = new_name
+        score_updates[subj["id"]] = {cn: float(row[cn]) for cn in comp_names}
+
+    scores_changed = not edited[comp_names].equals(df[comp_names])
+    if name_updates or scores_changed:
         with session_scope() as session:
-            repo.save_scores(session, sid, updates)
-        state = c.load_state(sid)  # reload clamped values
+            if name_updates:
+                repo.rename_subjects(session, sid, name_updates)
+            if scores_changed:
+                repo.save_scores(session, sid, score_updates)
+        state = c.load_state(sid)  # reload renamed/clamped values
 
     summary = repo.summarize_state(state)
     rows = pd.DataFrame(summary["rows"])
