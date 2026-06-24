@@ -18,6 +18,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
+from sqlalchemy import select
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -109,6 +110,18 @@ def import_user_folder(session, folder: Path, *, dry_run: bool) -> str:
 
 
 # ----------------------------------------------------------- history import ---
+def _clean_label(value) -> str:
+    """Coerce an empty / NaN Semester field to a sensible default.
+
+    Note: a float NaN is *truthy*, so ``nan or "Sem-1"`` returns nan — hence the
+    explicit pd.isna check rather than relying on ``or``.
+    """
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return "Sem-1"
+    text = str(value).strip()
+    return text if text and text.lower() != "nan" else "Sem-1"
+
+
 def _history_subjects(columns: list[str]) -> list[str]:
     return sorted({c.split("__")[0] for c in columns if c.endswith("__Total")})
 
@@ -133,7 +146,7 @@ def import_history(session, history_path: Path, *, dry_run: bool) -> list[str]:
     if first_user:
         fallback_uid = first_user.id
 
-    created = 0
+    created = skipped = 0
     for _, row in hist.iterrows():
         uid = fallback_uid
         if has_roll and str(row.get("RollNo", "")).strip():
@@ -144,11 +157,18 @@ def import_history(session, history_path: Path, *, dry_run: bool) -> list[str]:
         payload = _row_to_payload(row, subjects, comp_names)
         if dry_run:
             continue
-        ts = pd.to_datetime(row["Timestamp"]) if "Timestamp" in row else datetime.utcnow()
+        ts = pd.to_datetime(row["Timestamp"]) if "Timestamp" in row else datetime.now()
+        ts = ts.to_pydatetime() if hasattr(ts, "to_pydatetime") else ts
+        # idempotency: skip if this user already has a snapshot at this timestamp
+        if session.scalar(select(Snapshot).where(
+            Snapshot.user_id == uid, Snapshot.taken_at == ts
+        )):
+            skipped += 1
+            continue
         session.add(Snapshot(
             user_id=uid, semester_id=None,
-            semester_label=str(row.get("Semester", "") or "Sem-1"),
-            taken_at=ts.to_pydatetime() if hasattr(ts, "to_pydatetime") else ts,
+            semester_label=_clean_label(row.get("Semester")),
+            taken_at=ts,
             sgpa=float(row.get("SGPA", 0) or 0),
             total_credits=float(row.get("TotalCredits", 0) or 0),
             payload=payload,
@@ -159,7 +179,7 @@ def import_history(session, history_path: Path, *, dry_run: bool) -> list[str]:
     msgs.append(f"{verb} {len(hist)} history rows as snapshots "
                 f"(attributed by {'RollNo' if has_roll else 'first user'})")
     if not dry_run:
-        msgs.append(f"created {created} snapshots")
+        msgs.append(f"created {created} snapshots, skipped {skipped} duplicates")
     return msgs
 
 
@@ -176,7 +196,7 @@ def _row_to_payload(row, subjects: list[str], comp_names: list[str]) -> dict:
             "name": name, "credits": credits, "order_index": i,
             "scores": scores, "attendance": {"held": held, "attended": attended},
         })
-    return {"semester_label": str(row.get("Semester", "") or "Sem-1"),
+    return {"semester_label": _clean_label(row.get("Semester")),
             "perf_threshold": 50.0, "components": comps, "subjects": subj_payload}
 
 
