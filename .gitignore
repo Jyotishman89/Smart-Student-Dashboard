@@ -1,0 +1,26 @@
+# Secrets — never commit
+.streamlit/secrets.toml
+.env
+
+# Local database (SQLite dev fallback)
+*.db
+*.sqlite3
+
+# Legacy CSV data
+student_data/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
