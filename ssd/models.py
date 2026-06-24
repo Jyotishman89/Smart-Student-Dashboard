@@ -31,7 +31,8 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     full_name: Mapped[str] = mapped_column(String(255), default="")
-    roll_no: Mapped[str] = mapped_column(String(64), default="")
+    # Roll number is the login identifier — unique + indexed.
+    roll_no: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     semesters: Mapped[list[Semester]] = relationship(

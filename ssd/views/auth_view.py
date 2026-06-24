@@ -33,12 +33,12 @@ def render() -> None:
 
             with login_tab:
                 with st.form("login_form"):
-                    email = st.text_input("Email", placeholder="you@example.com")
+                    roll_no = st.text_input("Roll number", placeholder="e.g. CSB24009")
                     password = st.text_input("Password", type="password")
                     submitted = st.form_submit_button("Log in", type="primary",
                                                       use_container_width=True)
                 if submitted:
-                    ok, msg = auth.login(email, password)
+                    ok, msg = auth.login(roll_no, password)
                     if ok:
                         st.success(msg)
                         st.rerun()

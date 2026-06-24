@@ -11,7 +11,7 @@ PostgreSQL. Track marks, attendance, SGPA and CGPA — securely, across semester
 
 ## ✨ Features
 
-- 🔐 **Real accounts** — email + password signup/login, passwords hashed with **bcrypt**. Each user's data is private.
+- 🔐 **Real accounts** — sign up with your name, **roll number** and email; then **log in with your roll number + password** (hashed with **bcrypt**). Each user's data is private.
 - 🗄️ **Cloud database** — PostgreSQL (Neon). Data persists across redeploys (the old CSV version lost data on every restart).
 - 📚 **Marks & grades** — editable grid, live grade/percentage, pass/fail and performance alerts.
 - 🕒 **Attendance** — per-subject tracking with skip-vs-attend advice for the next class.

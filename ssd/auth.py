@@ -82,6 +82,9 @@ def _clear_cookie() -> None:
 def signup(email: str, full_name: str, roll_no: str,
            password: str, confirm: str) -> tuple[bool, str]:
     email = email.lower().strip()
+    roll_no = roll_no.strip()
+    if not roll_no:
+        return False, "Please enter your roll number."
     if not _EMAIL_RE.match(email):
         return False, "Please enter a valid email address."
     if len(password) < config.MIN_PASSWORD_LEN:
@@ -91,6 +94,9 @@ def signup(email: str, full_name: str, roll_no: str,
     if not full_name.strip():
         return False, "Please enter your name."
     with session_scope() as session:
+        # Roll number is the login identifier, so it must be unique.
+        if repo.get_user_by_roll_no(session, roll_no):
+            return False, "An account with that roll number already exists."
         if repo.get_user_by_email(session, email):
             return False, "An account with that email already exists."
         repo.create_user(
@@ -100,13 +106,13 @@ def signup(email: str, full_name: str, roll_no: str,
     return True, "Account created. You can log in now."
 
 
-def login(email: str, password: str) -> tuple[bool, str]:
+def login(roll_no: str, password: str) -> tuple[bool, str]:
     import streamlit as st
-    email = email.lower().strip()
+    roll_no = roll_no.strip()
     with session_scope() as session:
-        user = repo.get_user_by_email(session, email)
+        user = repo.get_user_by_roll_no(session, roll_no)
         if user is None or not verify_password(password, user.password_hash):
-            return False, "Invalid email or password."
+            return False, "Invalid roll number or password."
         st.session_state.user_id = user.id
         st.session_state.user_name = user.full_name
         st.session_state.user_email = user.email

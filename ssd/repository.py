@@ -18,7 +18,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from . import academics
@@ -61,6 +61,15 @@ def _scores_for(session: Session, subject_ids: list[int]) -> list[Score]:
 # ============================================================ users ===========
 def get_user_by_email(session: Session, email: str) -> User | None:
     return session.scalar(select(User).where(User.email == email.lower().strip()))
+
+
+def get_user_by_roll_no(session: Session, roll_no: str) -> User | None:
+    """Look up a user by roll number (case-insensitive). Roll number is the
+    login identifier, so this is how login resolves an account."""
+    roll = (roll_no or "").strip()
+    if not roll:
+        return None
+    return session.scalar(select(User).where(func.lower(User.roll_no) == roll.lower()))
 
 
 def get_user(session: Session, user_id: int) -> User | None:
