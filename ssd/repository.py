@@ -473,6 +473,15 @@ def restore_snapshot(session: Session, semester_id: int, snapshot_id: int) -> No
     save_scores(session, semester_id, score_updates)
     save_attendance(session, att_updates)
 
+    # Re-apply the SGPA this snapshot was recorded with, so restoring always
+    # shows that snapshot's SGPA — not 0. If the restored marks already reproduce
+    # it, stay in auto mode (None) so later mark edits keep recomputing; if they
+    # don't (the snapshot's SGPA came from a manual override), pin it.
+    auto = float(summarize_state(get_state(session, semester_id))["sgpa"])
+    target = float(snap.sgpa or 0.0)
+    set_sgpa_override(session, semester_id,
+                      None if abs(auto - target) <= 0.005 else round(target, 2))
+
 
 def cgpa_for_user(session: Session, user_id: int) -> tuple[Any, float, bool]:
     """CGPA for a user → (value, total_credits, is_manual).

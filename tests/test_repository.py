@@ -164,6 +164,41 @@ def test_sgpa_override(session):
     assert summ["sgpa_is_manual"] is False
 
 
+def test_restore_reapplies_manual_sgpa(session):
+    """A snapshot saved with a manual SGPA (and no marks) restores that SGPA,
+    not 0, even after the override has been cleared."""
+    user = _make_user(session)
+    sem = repo.get_active_semester(session, user.id)
+
+    repo.set_sgpa_override(session, sem.id, 8.5)  # manual SGPA, marks all 0
+    snap = repo.create_snapshot(session, user.id, sem.id)
+    assert float(snap.sgpa) == 8.5
+
+    repo.set_sgpa_override(session, sem.id, None)  # untick manual -> auto = 0
+    assert float(repo.summarize_state(repo.get_state(session, sem.id))["sgpa_effective"]) == 0.0
+
+    repo.restore_snapshot(session, sem.id, snap.id)
+    summ = repo.summarize_state(repo.get_state(session, sem.id))
+    assert summ["sgpa_is_manual"] is True
+    assert float(summ["sgpa_effective"]) == 8.5
+
+
+def test_restore_auto_snapshot_stays_live(session):
+    """A snapshot saved in auto mode restores without pinning an override, so
+    later mark edits keep recomputing the SGPA."""
+    user = _make_user(session)
+    sem = repo.get_active_semester(session, user.id)
+    sid0 = repo.get_state(session, sem.id)["subjects"][0]["id"]
+
+    repo.save_scores(session, sem.id, {sid0: {"End Term": 50, "Mid Term": 30}})
+    snap = repo.create_snapshot(session, user.id, sem.id)
+
+    repo.save_scores(session, sem.id, {sid0: {"End Term": 0, "Mid Term": 0}})
+    repo.restore_snapshot(session, sem.id, snap.id)
+    summ = repo.summarize_state(repo.get_state(session, sem.id))
+    assert summ["sgpa_is_manual"] is False  # not pinned — stays auto
+
+
 def test_cgpa_override(session):
     user = _make_user(session)
     repo.set_cgpa_override(session, user.id, 8.25)

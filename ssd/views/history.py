@@ -61,7 +61,10 @@ def render() -> None:
         if st.button("↩️ Restore selected", use_container_width=True):
             with session_scope() as session:
                 repo.restore_snapshot(session, sid, labels[pick])
-            st.toast("Snapshot restored into the active semester.", icon="↩️")
+                summ = repo.summarize_state(repo.get_state(session, sid))
+            st.toast(f"Restored — SGPA is now "
+                     f"{academics.round_2dp(summ['sgpa_effective'])}. "
+                     f"See your marks on the Marks tab.", icon="↩️")
             st.rerun()
 
     # ----- download -----
