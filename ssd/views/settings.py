@@ -40,22 +40,21 @@ def render() -> None:
 def _semester_section(uid: int, sid: int, state: dict) -> None:
     with st.container(border=True):
         st.markdown("##### 🎓 Semesters")
-        with session_scope() as session:
-            sems = [(s.id, s.label, s.is_active) for s in repo.list_semesters(session, uid)]
+        sems = c.semesters(uid)
 
         col1, col2 = st.columns([2, 1])
         with col1:
             new_label = st.text_input("Rename active semester",
                                       value=state["semester"]["label"], key="sem_label")
             if st.button("Save name"):
-                with session_scope() as session:
+                with c.writing() as session:
                     repo.update_semester_meta(session, sid, label=new_label)
                 st.toast("Semester renamed.", icon="✏️")
                 st.rerun()
         with col2:
             add_label = st.text_input("New semester label", placeholder="Sem-4", key="sem_new")
             if st.button("➕ Add semester"):
-                with session_scope() as session:
+                with c.writing() as session:
                     repo.seed_default_semester(session, uid,
                                                label=add_label.strip() or f"Sem-{len(sems)+1}",
                                                make_active=True)
@@ -65,7 +64,7 @@ def _semester_section(uid: int, sid: int, state: dict) -> None:
 
         if len(sems) > 1:
             if st.button("🗑️ Delete active semester", help="Removes this semester and its data."):
-                with session_scope() as session:
+                with c.writing() as session:
                     repo.delete_semester(session, uid, sid)
                 st.session_state.pop("active_semester_id", None)
                 st.toast("Semester deleted.", icon="🗑️")
@@ -91,7 +90,7 @@ def _subjects_section(uid: int, sid: int, state: dict) -> None:
             rows = [{"id": (None if _is_blank(r.get("id")) else int(r["id"])),
                      "name": r["Subject"], "credits": r.get("Credits", 0)}
                     for r in edited.to_dict("records") if str(r.get("Subject", "")).strip()]
-            with session_scope() as session:
+            with c.writing() as session:
                 repo.set_subjects(session, sid, rows)
             st.toast("Subjects updated.", icon="📘")
             st.rerun()
@@ -122,7 +121,7 @@ def _components_section(uid: int, sid: int, state: dict) -> None:
             rows = [{"id": (None if _is_blank(r.get("id")) else int(r["id"])),
                      "name": r["Component"], "max_marks": r.get("Max Marks", 0)}
                     for r in edited.to_dict("records") if str(r.get("Component", "")).strip()]
-            with session_scope() as session:
+            with c.writing() as session:
                 repo.set_components(session, sid, rows)
             st.toast("Weightage updated and marks re-clamped.", icon="🧮")
             st.rerun()
@@ -138,7 +137,7 @@ def _threshold_section(uid: int, sid: int, state: dict) -> None:
             value=int(state["semester"]["perf_threshold"]), step=1,
         )
         if value != int(state["semester"]["perf_threshold"]):
-            with session_scope() as session:
+            with c.writing() as session:
                 repo.update_semester_meta(session, sid, perf_threshold=float(value))
             st.toast(f"Threshold set to {value}%.", icon="🚩")
 
@@ -190,7 +189,7 @@ def _grades_section(uid: int, sid: int, state: dict) -> None:
                                  slug="sgpa", current=cur_sgpa, auto=auto_sgpa)
         if action:
             kind, val = action
-            with session_scope() as session:
+            with c.writing() as session:
                 repo.set_sgpa_override(session, sid, None if kind == "reset" else val)
             st.toast("SGPA setting saved.", icon="🎯")
             st.rerun()
@@ -200,7 +199,7 @@ def _grades_section(uid: int, sid: int, state: dict) -> None:
                                  current=cur_cgpa, auto=auto_cgpa)
         if action:
             kind, val = action
-            with session_scope() as session:
+            with c.writing() as session:
                 repo.set_cgpa_override(session, uid, None if kind == "reset" else val)
             st.toast("CGPA setting saved.", icon="🎯")
             st.rerun()

@@ -5,7 +5,7 @@ import streamlit as st
 
 from . import auth
 from . import repository as repo
-from .db import init_db, session_scope
+from .db import init_db
 from .theme import configure_page
 from .views import _common as common
 from .views import attendance, auth_view, history, home, marks, settings
@@ -28,15 +28,13 @@ def _sidebar(user_id: int) -> None:
         st.markdown(f"### 👋 {st.session_state.get('user_name', 'Student')}")
         st.caption(st.session_state.get("user_email", ""))
 
-        with session_scope() as session:
-            sems = [(s.id, s.label) for s in repo.list_semesters(session, user_id)]
-            active = repo.get_active_semester(session, user_id)
-            active_id = st.session_state.get("active_semester_id", active.id)
-
-        ids = [sid for sid, _ in sems]
-        labels = {sid: label for sid, label in sems}
+        sems = common.semesters(user_id)  # cached: [(id, label, is_active)]
+        ids = [s[0] for s in sems]
+        labels = {s[0]: s[1] for s in sems}
+        active_id = st.session_state.get("active_semester_id")
         if active_id not in ids:
-            active_id = ids[0]
+            active_id = next((s[0] for s in sems if s[2]), ids[0])
+
         chosen = st.selectbox(
             "Active semester", ids, index=ids.index(active_id),
             format_func=lambda sid: labels.get(sid, str(sid)),
@@ -44,7 +42,7 @@ def _sidebar(user_id: int) -> None:
         if chosen != active_id:
             st.session_state.active_semester_id = chosen
             common.set_viewing_snapshot(None)  # snapshots are per-semester
-            with session_scope() as session:
+            with common.writing() as session:
                 repo.set_active_semester(session, user_id, chosen)
             st.rerun()
         st.session_state.active_semester_id = chosen

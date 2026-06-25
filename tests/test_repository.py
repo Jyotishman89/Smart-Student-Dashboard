@@ -201,6 +201,26 @@ def test_restore_auto_snapshot_does_not_add_override(session):
     assert summ["sgpa_is_manual"] is False
 
 
+def test_delete_snapshot(session):
+    """A snapshot can be deleted by its owner, and only by its owner."""
+    user = _make_user(session)
+    sem = repo.get_active_semester(session, user.id)
+    snap = repo.create_snapshot(session, user.id, sem.id)
+    assert len(repo.list_snapshots(session, user.id)) == 1
+
+    # a different user cannot delete it
+    other = repo.create_user(session, email="other@x.com", password_hash="h",
+                             roll_no="OTHER1")
+    assert repo.delete_snapshot(session, other.id, snap.id) is False
+    assert len(repo.list_snapshots(session, user.id)) == 1
+
+    # the owner can
+    assert repo.delete_snapshot(session, user.id, snap.id) is True
+    assert repo.list_snapshots(session, user.id) == []
+    # deleting again is a no-op
+    assert repo.delete_snapshot(session, user.id, snap.id) is False
+
+
 def test_snapshots_scoped_per_semester(session):
     """Each semester keeps its own snapshots; one semester's snapshot can never
     be restored into another."""

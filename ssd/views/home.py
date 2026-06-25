@@ -6,7 +6,6 @@ import streamlit as st
 
 from .. import academics
 from .. import repository as repo
-from ..db import session_scope
 from ..theme import hero
 from . import _common as c
 
@@ -26,8 +25,7 @@ def render() -> None:
     c.view_banner(viewing)
     st.write("")
 
-    with session_scope() as session:
-        cgpa_val, cgpa_credits, cgpa_manual = repo.cgpa_for_user(session, uid)
+    cgpa_val, cgpa_credits, cgpa_manual = c.cgpa(uid)
 
     percents = [r["Percent"] for r in summary["rows"]]
     att_vals = [academics.att_percent(s["attendance"]["held"], s["attendance"]["attended"])

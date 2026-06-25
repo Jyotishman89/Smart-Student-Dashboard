@@ -8,7 +8,6 @@ import streamlit as st
 from .. import charts
 from .. import repository as repo
 from ..config import PASS_PERCENT, TARGET_PERCENT
-from ..db import session_scope
 from . import _common as c
 
 
@@ -39,7 +38,7 @@ def _persist_marks_edits(sid: int, subjects: list[dict], comp_names: set[str]) -
                 score_updates.setdefault(subj_id, {})[col] = 0.0 if val is None else float(val)
     if not (name_updates or score_updates):
         return
-    with session_scope() as session:
+    with c.writing() as session:
         if name_updates:
             repo.rename_subjects(session, sid, name_updates)
         if score_updates:

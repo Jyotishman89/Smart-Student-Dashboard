@@ -1,6 +1,7 @@
 """Helpers shared across page views."""
 from __future__ import annotations
 
+from contextlib import contextmanager
 from typing import Any
 
 import pandas as pd
@@ -36,9 +37,77 @@ def current_semester_id(user_id: int) -> int:
         return active.id
 
 
-def load_state(semester_id: int) -> dict[str, Any]:
+# ------------------------------------------------------ read cache + writes ---
+# Streamlit re-runs the whole script on every interaction, so without caching
+# each rerun re-queries Neon (several network round-trips) — which makes edits
+# and even plain dropdown changes feel laggy. Reads are cached keyed by a
+# per-session "data version"; any write bumps that version, so cached reads stay
+# correct yet a rerun that changes nothing does zero database work.
+def data_version() -> int:
+    try:
+        return int(st.session_state.get("_data_version", 0))
+    except Exception:
+        return 0
+
+
+def invalidate_data() -> None:
+    """Bump the data version so all cached reads refetch on the next rerun."""
+    try:
+        st.session_state["_data_version"] = data_version() + 1
+    except Exception:
+        pass
+
+
+@contextmanager
+def writing():
+    """Open a DB session for a write and invalidate cached reads on success."""
+    with session_scope() as session:
+        yield session
+    invalidate_data()
+
+
+@st.cache_data(show_spinner=False, ttl=30, max_entries=256)
+def _state_cached(semester_id: int, version: int) -> dict[str, Any]:
     with session_scope() as session:
         return repo.get_state(session, semester_id)
+
+
+def load_state(semester_id: int) -> dict[str, Any]:
+    return _state_cached(semester_id, data_version())
+
+
+@st.cache_data(show_spinner=False, ttl=30, max_entries=64)
+def _semesters_cached(user_id: int, version: int) -> list[tuple[int, str, bool]]:
+    with session_scope() as session:
+        return [(s.id, s.label, bool(s.is_active))
+                for s in repo.list_semesters(session, user_id)]
+
+
+def semesters(user_id: int) -> list[tuple[int, str, bool]]:
+    return _semesters_cached(user_id, data_version())
+
+
+@st.cache_data(show_spinner=False, ttl=30, max_entries=128)
+def _snapshots_cached(user_id: int, semester_id: int, version: int) -> list[dict]:
+    with session_scope() as session:
+        return [{
+            "id": s.id, "taken_at": s.taken_at, "label": s.semester_label,
+            "sgpa": s.sgpa, "total_credits": s.total_credits, "payload": s.payload or {},
+        } for s in repo.list_snapshots(session, user_id, semester_id)]
+
+
+def snapshots(user_id: int, semester_id: int) -> list[dict]:
+    return _snapshots_cached(user_id, semester_id, data_version())
+
+
+@st.cache_data(show_spinner=False, ttl=30, max_entries=64)
+def _cgpa_cached(user_id: int, version: int) -> tuple[Any, float, bool]:
+    with session_scope() as session:
+        return repo.cgpa_for_user(session, user_id)
+
+
+def cgpa(user_id: int) -> tuple[Any, float, bool]:
+    return _cgpa_cached(user_id, data_version())
 
 
 # --------------------------------------------------- snapshot browse mode ----
@@ -101,15 +170,10 @@ def page_state(user_id: int, semester_id: int) -> tuple[dict[str, Any], dict | N
     """
     snap_id = viewing_snapshot_id()
     if snap_id is not None:
-        with session_scope() as session:
-            snap = repo.get_snapshot(session, snap_id)
-            if (snap is not None and snap.user_id == user_id
-                    and snap.semester_id == semester_id):
-                snap_dict = {
-                    "id": snap.id, "taken_at": snap.taken_at, "sgpa": snap.sgpa,
-                    "total_credits": snap.total_credits, "payload": snap.payload or {},
-                }
-                return _snapshot_to_state(snap_dict, semester_id), snap_dict
+        # reuse the cached per-semester snapshot list (no extra DB round-trip)
+        for snap in snapshots(user_id, semester_id):
+            if snap["id"] == snap_id:
+                return _snapshot_to_state(snap, semester_id), snap
         set_viewing_snapshot(None)  # stale (deleted / other semester) → fall to live
     return load_state(semester_id), None
 

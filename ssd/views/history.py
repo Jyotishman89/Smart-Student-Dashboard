@@ -8,17 +8,7 @@ import streamlit as st
 
 from .. import academics, charts
 from .. import repository as repo
-from ..db import session_scope
 from . import _common as c
-
-
-def _snapshots_as_dicts(user_id: int, semester_id: int) -> list[dict]:
-    with session_scope() as session:
-        snaps = repo.list_snapshots(session, user_id, semester_id)
-        return [{
-            "id": s.id, "taken_at": s.taken_at, "label": s.semester_label,
-            "sgpa": s.sgpa, "total_credits": s.total_credits, "payload": s.payload or {},
-        } for s in snaps]
 
 
 def render() -> None:
@@ -29,9 +19,8 @@ def render() -> None:
 
     st.subheader("📈 History & CGPA")
 
-    snaps = _snapshots_as_dicts(uid, sid)
-    with session_scope() as session:
-        cgpa_val, cgpa_credits, cgpa_manual = repo.cgpa_for_user(session, uid)
+    snaps = c.snapshots(uid, sid)
+    cgpa_val, cgpa_credits, cgpa_manual = c.cgpa(uid)
 
     # ----- switch the WHOLE app between live data and any saved snapshot -----
     # Selecting a snapshot here puts every page into a read-only view of that
@@ -70,13 +59,13 @@ def render() -> None:
                 help="Set manually in Settings." if cgpa_manual else None)
 
     # ----- actions -----
-    a1, a2 = st.columns(2)
+    a1, a2, a3 = st.columns(3)
     with a1:
         if st.button("💾 Save snapshot", type="primary", use_container_width=True,
                      disabled=viewing is not None,
                      help=("Return to live to save." if viewing is not None
                            else "Save your current live data as a snapshot.")):
-            with session_scope() as session:
+            with c.writing() as session:
                 repo.create_snapshot(session, uid, sid)
             st.toast("Snapshot saved.", icon="💾")
             st.rerun()
@@ -86,12 +75,27 @@ def render() -> None:
                      help=("Overwrites this semester's live marks with the snapshot "
                            "you're viewing." if viewing is not None
                            else "Select a snapshot above to enable restore.")):
-            with session_scope() as session:
+            with c.writing() as session:
                 repo.restore_snapshot(session, sid, viewing["id"])
             c.set_viewing_snapshot(None)  # the snapshot is now your live data
             st.toast("Snapshot restored into your live data. "
                      "Manual SGPA/CGPA settings were left unchanged.", icon="↩️")
             st.rerun()
+    with a3:
+        if viewing is not None:
+            with st.popover("🗑️ Delete", use_container_width=True):
+                st.warning(f"Permanently delete the snapshot from "
+                           f"**{viewing['taken_at']:%Y-%m-%d %H:%M}**? "
+                           "This can't be undone.")
+                if st.button("Yes, delete", type="primary", key="confirm_delete_snap"):
+                    with c.writing() as session:
+                        repo.delete_snapshot(session, uid, viewing["id"])
+                    c.set_viewing_snapshot(None)
+                    st.toast("Snapshot deleted.", icon="🗑️")
+                    st.rerun()
+        else:
+            st.button("🗑️ Delete", use_container_width=True, disabled=True,
+                      help="Select a snapshot above to delete it.")
 
     if not snaps:
         st.info(f"No snapshots yet for {state['semester']['label']}. "

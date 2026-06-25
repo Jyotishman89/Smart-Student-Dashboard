@@ -7,7 +7,6 @@ import streamlit as st
 from .. import academics, charts
 from .. import repository as repo
 from ..config import ATTENDANCE_REQ
-from ..db import session_scope
 from . import _common as c
 
 
@@ -33,7 +32,7 @@ def _persist_attendance_edits(subjects: list[dict]) -> None:
         attended = changes.get("Classes Attended", subj["attendance"]["attended"])
         updates[subj["id"]] = (_cell_int(held), _cell_int(attended))
     if updates:
-        with session_scope() as session:
+        with c.writing() as session:
             repo.save_attendance(session, updates)
 
 

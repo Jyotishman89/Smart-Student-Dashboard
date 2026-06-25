@@ -457,6 +457,18 @@ def get_snapshot(session: Session, snapshot_id: int) -> Snapshot | None:
     return session.get(Snapshot, snapshot_id)
 
 
+def delete_snapshot(session: Session, user_id: int, snapshot_id: int) -> bool:
+    """Delete one of the user's snapshots. Returns True if a row was removed.
+
+    Scoped to ``user_id`` so a snapshot can only ever be deleted by its owner.
+    """
+    snap = session.get(Snapshot, snapshot_id)
+    if snap is None or snap.user_id != user_id:
+        return False
+    session.delete(snap)
+    return True
+
+
 def restore_snapshot(session: Session, semester_id: int, snapshot_id: int) -> None:
     """Overwrite a semester's subjects/components/scores/attendance from one of
     *its own* snapshots.
