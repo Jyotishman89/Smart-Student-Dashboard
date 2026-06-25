@@ -7,6 +7,7 @@ from . import auth
 from . import repository as repo
 from .db import init_db, session_scope
 from .theme import configure_page
+from .views import _common as common
 from .views import attendance, auth_view, history, home, marks, settings
 
 
@@ -42,6 +43,7 @@ def _sidebar(user_id: int) -> None:
         )
         if chosen != active_id:
             st.session_state.active_semester_id = chosen
+            common.set_viewing_snapshot(None)  # snapshots are per-semester
             with session_scope() as session:
                 repo.set_active_semester(session, user_id, chosen)
             st.rerun()

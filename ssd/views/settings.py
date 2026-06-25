@@ -12,9 +12,16 @@ from . import _common as c
 def render() -> None:
     uid = c.require_user()
     sid = c.current_semester_id(uid)
-    state = c.load_state(sid)
+    state = c.load_state(sid)  # Settings always edits live data, never a snapshot
 
     st.subheader("⚙️ Settings")
+    if c.viewing_snapshot_id() is not None:
+        cols = st.columns([4, 1])
+        cols[0].info("👁️ You're viewing a snapshot elsewhere. Settings still edit your "
+                     "live data.")
+        if cols[1].button("↩️ Return to live", use_container_width=True):
+            c.set_viewing_snapshot(None)
+            st.rerun()
 
     _semester_section(uid, sid, state)
     st.divider()

@@ -49,9 +49,10 @@ def _persist_marks_edits(sid: int, subjects: list[dict], comp_names: set[str]) -
 def render() -> None:
     uid = c.require_user()
     sid = c.current_semester_id(uid)
-    state = c.load_state(sid)
+    state, viewing = c.page_state(uid, sid)
 
     st.subheader("📚 Marks & Exams")
+    c.view_banner(viewing)
     if not state["subjects"]:
         st.info("No subjects yet.")
         return
@@ -60,9 +61,13 @@ def render() -> None:
     with top[0]:
         chart_kind = c.chart_type("marks_chart_type")
     with top[1]:
-        st.caption(f"Pass line at {PASS_PERCENT:g}% • Target line at {TARGET_PERCENT:g}%. "
-                   "Edit marks or rename a subject in the grid below — changes save "
-                   "automatically.")
+        if viewing:
+            st.caption(f"Pass line at {PASS_PERCENT:g}% • Target line at {TARGET_PERCENT:g}%. "
+                       "Read-only — you're viewing a saved snapshot.")
+        else:
+            st.caption(f"Pass line at {PASS_PERCENT:g}% • Target line at {TARGET_PERCENT:g}%. "
+                       "Edit marks or rename a subject in the grid below — changes save "
+                       "automatically.")
 
     # ----- editable grid (rename subjects inline + edit marks) -----
     df = c.marks_dataframe(state)
@@ -74,14 +79,18 @@ def render() -> None:
             f"{comp['name']} ({comp['max_marks']:g})",
             min_value=0.0, max_value=float(comp["max_marks"]), step=0.5,
         )
-    # Edits persist via the on_change callback (runs before the rerun), so by the
-    # time this script body runs again `state` already reflects the latest edit.
-    st.data_editor(
-        df, hide_index=True, use_container_width=True, num_rows="fixed",
-        column_config=col_cfg, key="marks_editor",
-        on_change=_persist_marks_edits,
-        args=(sid, state["subjects"], {cc["name"] for cc in state["components"]}),
-    )
+    if viewing:
+        # browsing a snapshot → read-only table, no save wiring
+        st.dataframe(df, hide_index=True, use_container_width=True, column_config=col_cfg)
+    else:
+        # Edits persist via the on_change callback (runs before the rerun), so by the
+        # time this script body runs again `state` already reflects the latest edit.
+        st.data_editor(
+            df, hide_index=True, use_container_width=True, num_rows="fixed",
+            column_config=col_cfg, key="marks_editor",
+            on_change=_persist_marks_edits,
+            args=(sid, state["subjects"], {cc["name"] for cc in state["components"]}),
+        )
 
     summary = repo.summarize_state(state)
     rows = pd.DataFrame(summary["rows"])

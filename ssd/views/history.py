@@ -24,50 +24,79 @@ def _snapshots_as_dicts(user_id: int, semester_id: int) -> list[dict]:
 def render() -> None:
     uid = c.require_user()
     sid = c.current_semester_id(uid)
-    state = c.load_state(sid)
+    state, viewing = c.page_state(uid, sid)
     summary = repo.summarize_state(state)
 
     st.subheader("📈 History & CGPA")
 
+    snaps = _snapshots_as_dicts(uid, sid)
     with session_scope() as session:
         cgpa_val, cgpa_credits, cgpa_manual = repo.cgpa_for_user(session, uid)
 
+    # ----- switch the WHOLE app between live data and any saved snapshot -----
+    # Selecting a snapshot here puts every page into a read-only view of that
+    # snapshot; "Current (live)" returns to your real data. It never writes to
+    # the database, so marks and manual SGPA/CGPA settings stay untouched.
+    LIVE = "Current (live)"
+    options: dict[str, int | None] = {LIVE: None}
+    for s in snaps:
+        options[f"{s['taken_at']:%Y-%m-%d %H:%M}  ·  SGPA "
+                f"{academics.round_2dp_from_float(s['sgpa'])}"] = s["id"]
+    if snaps:
+        labels = list(options)
+        current = next((lbl for lbl, snap_id in options.items()
+                        if snap_id == c.viewing_snapshot_id()), LIVE)
+        pick = st.selectbox(
+            f"View — {state['semester']['label']}", labels,
+            index=labels.index(current), key=f"view_{sid}",
+            help="Switch the whole app between your live data and any saved "
+                 "snapshot. Viewing a snapshot is read-only and never changes "
+                 "your marks or manual settings.",
+        )
+        if options[pick] != c.viewing_snapshot_id():
+            c.set_viewing_snapshot(options[pick])
+            st.rerun()
+
+    c.view_banner(viewing)
+
+    # ----- metric cards reflect the current view (live or snapshot) -----
     k = st.columns(3)
-    k[0].metric("Current SGPA", f"{academics.round_2dp(summary['sgpa_effective'])}",
-                help="Set manually in Settings." if summary["sgpa_is_manual"] else None)
+    k[0].metric("SGPA", f"{academics.round_2dp(summary['sgpa_effective'])}",
+                help=(f"Snapshot from {viewing['taken_at']:%Y-%m-%d %H:%M}." if viewing
+                      else ("Set manually in Settings." if summary["sgpa_is_manual"]
+                            else None)))
     k[1].metric("Semester Credits", f"{summary['total_credits']:.0f}")
     k[2].metric("CGPA (latest per semester)", f"{academics.round_2dp(cgpa_val)}",
                 help="Set manually in Settings." if cgpa_manual else None)
 
     # ----- actions -----
-    a1, a2 = st.columns([1, 2])
+    a1, a2 = st.columns(2)
     with a1:
-        if st.button("💾 Save snapshot", type="primary", use_container_width=True):
+        if st.button("💾 Save snapshot", type="primary", use_container_width=True,
+                     disabled=viewing is not None,
+                     help=("Return to live to save." if viewing is not None
+                           else "Save your current live data as a snapshot.")):
             with session_scope() as session:
                 repo.create_snapshot(session, uid, sid)
             st.toast("Snapshot saved.", icon="💾")
             st.rerun()
+    with a2:
+        if st.button(f"↩️ Restore into {state['semester']['label']}",
+                     use_container_width=True, disabled=viewing is None,
+                     help=("Overwrites this semester's live marks with the snapshot "
+                           "you're viewing." if viewing is not None
+                           else "Select a snapshot above to enable restore.")):
+            with session_scope() as session:
+                repo.restore_snapshot(session, sid, viewing["id"])
+            c.set_viewing_snapshot(None)  # the snapshot is now your live data
+            st.toast("Snapshot restored into your live data. "
+                     "Manual SGPA/CGPA settings were left unchanged.", icon="↩️")
+            st.rerun()
 
-    snaps = _snapshots_as_dicts(uid, sid)
     if not snaps:
         st.info(f"No snapshots yet for {state['semester']['label']}. "
                 "Save one to start building this semester's history.")
         return
-
-    with a2:
-        labels = {f"{s['taken_at']:%Y-%m-%d %H:%M} "
-                  f"(SGPA {academics.round_2dp_from_float(s['sgpa'])})": s["id"]
-                  for s in snaps}
-        pick = st.selectbox(f"Restore a snapshot into {state['semester']['label']}",
-                            list(labels))
-        if st.button("↩️ Restore selected", use_container_width=True):
-            with session_scope() as session:
-                repo.restore_snapshot(session, sid, labels[pick])
-                summ = repo.summarize_state(repo.get_state(session, sid))
-            st.toast(f"Restored — SGPA is now "
-                     f"{academics.round_2dp(summ['sgpa_effective'])}. "
-                     f"See your marks on the Marks tab.", icon="↩️")
-            st.rerun()
 
     # ----- download -----
     hist_df = pd.DataFrame([

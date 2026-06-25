@@ -453,6 +453,10 @@ def list_snapshots(session: Session, user_id: int,
     return list(session.scalars(stmt.order_by(Snapshot.taken_at.desc())))
 
 
+def get_snapshot(session: Session, snapshot_id: int) -> Snapshot | None:
+    return session.get(Snapshot, snapshot_id)
+
+
 def restore_snapshot(session: Session, semester_id: int, snapshot_id: int) -> None:
     """Overwrite a semester's subjects/components/scores/attendance from one of
     *its own* snapshots.

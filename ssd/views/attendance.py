@@ -40,9 +40,10 @@ def _persist_attendance_edits(subjects: list[dict]) -> None:
 def render() -> None:
     uid = c.require_user()
     sid = c.current_semester_id(uid)
-    state = c.load_state(sid)
+    state, viewing = c.page_state(uid, sid)
 
     st.subheader("🕒 Attendance Tracker")
+    c.view_banner(viewing)
     if not state["subjects"]:
         st.info("No subjects yet.")
         return
@@ -51,22 +52,29 @@ def render() -> None:
     with top[0]:
         chart_kind = c.chart_type("att_chart_type")
     with top[1]:
-        st.caption(f"Minimum required attendance: {ATTENDANCE_REQ:g}%. "
-                   "Edit the grid below — changes save automatically.")
+        if viewing:
+            st.caption(f"Minimum required attendance: {ATTENDANCE_REQ:g}%. "
+                       "Read-only — you're viewing a saved snapshot.")
+        else:
+            st.caption(f"Minimum required attendance: {ATTENDANCE_REQ:g}%. "
+                       "Edit the grid below — changes save automatically.")
 
     df = c.attendance_dataframe(state)
-    st.data_editor(
-        df, hide_index=True, use_container_width=True, num_rows="fixed",
-        column_config={
-            "Subject": st.column_config.TextColumn("Subject", disabled=True),
-            "Classes Held": st.column_config.NumberColumn("Classes Held", min_value=0, step=1),
-            "Classes Attended": st.column_config.NumberColumn("Classes Attended",
-                                                              min_value=0, step=1),
-        },
-        key="att_editor",
-        on_change=_persist_attendance_edits,
-        args=(state["subjects"],),
-    )
+    col_cfg = {
+        "Subject": st.column_config.TextColumn("Subject", disabled=True),
+        "Classes Held": st.column_config.NumberColumn("Classes Held", min_value=0, step=1),
+        "Classes Attended": st.column_config.NumberColumn("Classes Attended",
+                                                          min_value=0, step=1),
+    }
+    if viewing:
+        st.dataframe(df, hide_index=True, use_container_width=True, column_config=col_cfg)
+    else:
+        st.data_editor(
+            df, hide_index=True, use_container_width=True, num_rows="fixed",
+            column_config=col_cfg, key="att_editor",
+            on_change=_persist_attendance_edits,
+            args=(state["subjects"],),
+        )
 
     # ----- compute advice -----
     records = []

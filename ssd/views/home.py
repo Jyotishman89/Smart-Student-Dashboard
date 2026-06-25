@@ -14,7 +14,7 @@ from . import _common as c
 def render() -> None:
     uid = c.require_user()
     sid = c.current_semester_id(uid)
-    state = c.load_state(sid)
+    state, viewing = c.page_state(uid, sid)
     summary = repo.summarize_state(state)
 
     name = st.session_state.get("user_name") or "there"
@@ -23,6 +23,7 @@ def render() -> None:
         f"Active semester: {state['semester']['label']}",
         chips=["Marks", "Attendance", "SGPA / CGPA", "Snapshots"],
     )
+    c.view_banner(viewing)
     st.write("")
 
     with session_scope() as session:
@@ -34,7 +35,8 @@ def render() -> None:
 
     k1, k2, k3, k4 = st.columns(4)
     k1.metric("Current SGPA", f"{academics.round_2dp(summary['sgpa_effective'])}",
-              help="Set manually in Settings." if summary["sgpa_is_manual"] else None)
+              help=(f"From snapshot {viewing['taken_at']:%Y-%m-%d %H:%M}." if viewing
+                    else ("Set manually in Settings." if summary["sgpa_is_manual"] else None)))
     k2.metric("CGPA", f"{academics.round_2dp(cgpa_val)}",
               help="Set manually in Settings." if cgpa_manual else None)
     k3.metric("Average %", f"{np.mean(percents):.1f}" if percents else "0.0")
