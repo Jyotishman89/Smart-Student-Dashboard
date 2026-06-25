@@ -164,39 +164,64 @@ def test_sgpa_override(session):
     assert summ["sgpa_is_manual"] is False
 
 
-def test_restore_reapplies_manual_sgpa(session):
-    """A snapshot saved with a manual SGPA (and no marks) restores that SGPA,
-    not 0, even after the override has been cleared."""
+def test_restore_leaves_manual_override_untouched(session):
+    """A manual SGPA override is an independent, sticky setting: restore changes
+    marks only and must neither set nor clear it."""
     user = _make_user(session)
     sem = repo.get_active_semester(session, user.id)
+    sid0 = repo.get_state(session, sem.id)["subjects"][0]["id"]
 
-    repo.set_sgpa_override(session, sem.id, 8.5)  # manual SGPA, marks all 0
+    first_name = repo.get_state(session, sem.id)["subjects"][0]["name"]
+    repo.set_sgpa_override(session, sem.id, 8.5)
+    repo.save_scores(session, sem.id, {sid0: {"End Term": 50}})
     snap = repo.create_snapshot(session, user.id, sem.id)
-    assert float(snap.sgpa) == 8.5
-
-    repo.set_sgpa_override(session, sem.id, None)  # untick manual -> auto = 0
-    assert float(repo.summarize_state(repo.get_state(session, sem.id))["sgpa_effective"]) == 0.0
+    repo.save_scores(session, sem.id, {sid0: {"End Term": 10}})  # diverge
 
     repo.restore_snapshot(session, sem.id, snap.id)
     summ = repo.summarize_state(repo.get_state(session, sem.id))
-    assert summ["sgpa_is_manual"] is True
+    assert summ["sgpa_is_manual"] is True            # override untouched
     assert float(summ["sgpa_effective"]) == 8.5
+    restored = repo.get_state(session, sem.id)
+    first = next(s for s in restored["subjects"] if s["name"] == first_name)
+    assert first["scores"]["End Term"] == 50.0       # marks were restored
 
 
-def test_restore_auto_snapshot_stays_live(session):
-    """A snapshot saved in auto mode restores without pinning an override, so
-    later mark edits keep recomputing the SGPA."""
+def test_restore_auto_snapshot_does_not_add_override(session):
+    """Restoring a snapshot never introduces an override on a semester that had
+    none, so the SGPA stays auto/live."""
     user = _make_user(session)
     sem = repo.get_active_semester(session, user.id)
     sid0 = repo.get_state(session, sem.id)["subjects"][0]["id"]
 
     repo.save_scores(session, sem.id, {sid0: {"End Term": 50, "Mid Term": 30}})
     snap = repo.create_snapshot(session, user.id, sem.id)
-
     repo.save_scores(session, sem.id, {sid0: {"End Term": 0, "Mid Term": 0}})
     repo.restore_snapshot(session, sem.id, snap.id)
     summ = repo.summarize_state(repo.get_state(session, sem.id))
-    assert summ["sgpa_is_manual"] is False  # not pinned — stays auto
+    assert summ["sgpa_is_manual"] is False
+
+
+def test_snapshots_scoped_per_semester(session):
+    """Each semester keeps its own snapshots; one semester's snapshot can never
+    be restored into another."""
+    user = _make_user(session)
+    sem1 = repo.get_active_semester(session, user.id)
+    sem2 = repo.seed_default_semester(session, user.id, label="Sem-2", make_active=True)
+
+    s1_subj = repo.get_state(session, sem1.id)["subjects"][0]["id"]
+    repo.save_scores(session, sem1.id, {s1_subj: {"End Term": 40}})
+    snap1 = repo.create_snapshot(session, user.id, sem1.id)
+    snap2 = repo.create_snapshot(session, user.id, sem2.id)
+
+    # the dropdown for each semester only sees its own snapshots
+    assert {s.id for s in repo.list_snapshots(session, user.id, sem1.id)} == {snap1.id}
+    assert {s.id for s in repo.list_snapshots(session, user.id, sem2.id)} == {snap2.id}
+
+    # restoring Sem-1's snapshot into Sem-2 is refused — no cross-semester bleed
+    before = [s["name"] for s in repo.get_state(session, sem2.id)["subjects"]]
+    repo.restore_snapshot(session, sem2.id, snap1.id)
+    after = [s["name"] for s in repo.get_state(session, sem2.id)["subjects"]]
+    assert before == after
 
 
 def test_cgpa_override(session):

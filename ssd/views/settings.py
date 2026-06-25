@@ -137,39 +137,65 @@ def _threshold_section(uid: int, sid: int, state: dict) -> None:
 
 
 # ------------------------------------------------------------ sgpa / cgpa -----
+def _override_block(*, label: str, slug: str, current, auto: float) -> tuple[str, float] | None:
+    """Render one SGPA/CGPA override row.
+
+    Returns ``("save", value)``, ``("reset", 0.0)``, or ``None``. The typed value
+    is *sticky*: once saved it stays the shown value even after the "Edit" box is
+    unticked. Auto-calculation applies only until a manual value is first saved,
+    and "Reset to auto-calculated" is the only way back to auto.
+    """
+    shown = float(current) if current is not None else auto
+    tag = "manual" if current is not None else "auto-calculated"
+    st.markdown(f"**{label}:**  {shown:.2f}  _({tag})_")
+    st.caption(f"Calculated from marks: {auto:.2f}")
+    if st.checkbox(f"Edit {slug.upper()} manually", value=False, key=f"edit_{slug}"):
+        val = st.number_input(f"Your {slug.upper()}", min_value=0.0, max_value=10.0,
+                              step=0.01, value=shown)
+        c1, c2 = st.columns(2)
+        if c1.button(f"Save {slug.upper()}", type="primary", key=f"save_{slug}"):
+            return ("save", round(float(val), 2))
+        if current is not None and c2.button("Reset to auto-calculated",
+                                             key=f"reset_{slug}"):
+            return ("reset", 0.0)
+    elif current is not None:
+        if st.button("Reset to auto-calculated", key=f"reset_{slug}_c"):
+            return ("reset", 0.0)
+    return None
+
+
 def _grades_section(uid: int, sid: int, state: dict) -> None:
     with st.container(border=True):
         st.markdown("##### 🎯 SGPA / CGPA")
-        st.caption("Both are calculated from your marks by default. Tick a box to type "
-                   "your own value instead (e.g. your official university result).")
+        st.caption("Calculated from your marks by default. Type your own value to "
+                   "override (e.g. your official university result) — it stays shown "
+                   "even if you untick the box, until you reset it to auto.")
 
         auto_sgpa = float(academics.round_2dp(repo.summarize_state(state)["sgpa"]))
         cur_sgpa = state["semester"].get("sgpa_override")
         with session_scope() as session:
             user = repo.get_user(session, uid)
             cur_cgpa = user.cgpa_override if user else None
+            auto_cgpa_val, _credits = repo.cgpa_auto_for_user(session, uid)
+        auto_cgpa = float(academics.round_2dp(auto_cgpa_val))
 
-        with st.form("override_form"):
-            st.markdown(f"**SGPA — {state['semester']['label']}**  "
-                        f"_(auto-calculated: {auto_sgpa:.2f})_")
-            man_s = st.checkbox("Enter SGPA manually", value=cur_sgpa is not None)
-            sgpa_in = st.number_input(
-                "Your SGPA", min_value=0.0, max_value=10.0, step=0.01,
-                value=float(cur_sgpa) if cur_sgpa is not None else auto_sgpa,
-            )
-            st.divider()
-            st.markdown("**CGPA — overall**")
-            man_c = st.checkbox("Enter CGPA manually", value=cur_cgpa is not None)
-            cgpa_in = st.number_input(
-                "Your CGPA", min_value=0.0, max_value=10.0, step=0.01,
-                value=float(cur_cgpa) if cur_cgpa is not None else 0.0,
-            )
-            submitted = st.form_submit_button("Save SGPA / CGPA", type="primary")
-        if submitted:
+        action = _override_block(label=f"SGPA — {state['semester']['label']}",
+                                 slug="sgpa", current=cur_sgpa, auto=auto_sgpa)
+        if action:
+            kind, val = action
             with session_scope() as session:
-                repo.set_sgpa_override(session, sid, round(sgpa_in, 2) if man_s else None)
-                repo.set_cgpa_override(session, uid, round(cgpa_in, 2) if man_c else None)
-            st.toast("SGPA / CGPA settings saved.", icon="🎯")
+                repo.set_sgpa_override(session, sid, None if kind == "reset" else val)
+            st.toast("SGPA setting saved.", icon="🎯")
+            st.rerun()
+
+        st.divider()
+        action = _override_block(label="CGPA — overall", slug="cgpa",
+                                 current=cur_cgpa, auto=auto_cgpa)
+        if action:
+            kind, val = action
+            with session_scope() as session:
+                repo.set_cgpa_override(session, uid, None if kind == "reset" else val)
+            st.toast("CGPA setting saved.", icon="🎯")
             st.rerun()
 
 

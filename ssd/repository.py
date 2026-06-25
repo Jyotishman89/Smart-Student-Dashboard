@@ -439,23 +439,37 @@ def create_snapshot(session: Session, user_id: int, semester_id: int) -> Snapsho
     return snap
 
 
-def list_snapshots(session: Session, user_id: int) -> list[Snapshot]:
-    return list(
-        session.scalars(
-            select(Snapshot).where(Snapshot.user_id == user_id).order_by(Snapshot.taken_at.desc())
-        )
-    )
+def list_snapshots(session: Session, user_id: int,
+                   semester_id: int | None = None) -> list[Snapshot]:
+    """Snapshots for a user, newest first.
+
+    Pass ``semester_id`` to get only that semester's snapshots — each semester
+    keeps its own independent history, so the History dropdown never mixes one
+    semester's save points with another's.
+    """
+    stmt = select(Snapshot).where(Snapshot.user_id == user_id)
+    if semester_id is not None:
+        stmt = stmt.where(Snapshot.semester_id == semester_id)
+    return list(session.scalars(stmt.order_by(Snapshot.taken_at.desc())))
 
 
 def restore_snapshot(session: Session, semester_id: int, snapshot_id: int) -> None:
-    """Overwrite a semester's subjects/components/scores/attendance from a snapshot."""
+    """Overwrite a semester's subjects/components/scores/attendance from one of
+    *its own* snapshots.
+
+    A snapshot can only be restored into the semester it was taken from, so one
+    semester's subjects/marks can never bleed into another. Manual SGPA/CGPA
+    overrides are independent, sticky settings and are deliberately left
+    untouched here — restoring changes marks only.
+    """
     snap = session.get(Snapshot, snapshot_id)
     sem = session.get(Semester, semester_id)
     if snap is None or sem is None:
         return
+    if snap.semester_id is not None and snap.semester_id != semester_id:
+        return  # refuse cross-semester restore — keeps Sem-1 out of Sem-4 etc.
     payload = snap.payload or {}
     update_semester_meta(session, semester_id,
-                         label=payload.get("semester_label"),
                          perf_threshold=payload.get("perf_threshold"))
     set_components(session, semester_id, payload.get("components", []))
     set_subjects(session, semester_id, payload.get("subjects", []))
@@ -473,14 +487,16 @@ def restore_snapshot(session: Session, semester_id: int, snapshot_id: int) -> No
     save_scores(session, semester_id, score_updates)
     save_attendance(session, att_updates)
 
-    # Re-apply the SGPA this snapshot was recorded with, so restoring always
-    # shows that snapshot's SGPA — not 0. If the restored marks already reproduce
-    # it, stay in auto mode (None) so later mark edits keep recomputing; if they
-    # don't (the snapshot's SGPA came from a manual override), pin it.
-    auto = float(summarize_state(get_state(session, semester_id))["sgpa"])
-    target = float(snap.sgpa or 0.0)
-    set_sgpa_override(session, semester_id,
-                      None if abs(auto - target) <= 0.005 else round(target, 2))
+
+def cgpa_auto_for_user(session: Session, user_id: int) -> tuple[Any, float]:
+    """Credit-weighted CGPA from the latest snapshot per semester, *ignoring* any
+    manual override → (value, total_credits). Used to show the auto value in
+    Settings alongside a manual entry.
+    """
+    latest: dict[str, Snapshot] = {}
+    for snap in list_snapshots(session, user_id):  # already newest-first
+        latest.setdefault(snap.semester_label, snap)
+    return academics.cgpa([(s.sgpa, s.total_credits) for s in latest.values()])
 
 
 def cgpa_for_user(session: Session, user_id: int) -> tuple[Any, float, bool]:
@@ -489,12 +505,7 @@ def cgpa_for_user(session: Session, user_id: int) -> tuple[Any, float, bool]:
     A manual override on the user wins; otherwise it is the credit-weighted
     average of the latest snapshot per semester label.
     """
-    snaps = list_snapshots(session, user_id)
-    latest: dict[str, Snapshot] = {}
-    for snap in snaps:  # already newest-first
-        latest.setdefault(snap.semester_label, snap)
-    results = [(s.sgpa, s.total_credits) for s in latest.values()]
-    value, credits = academics.cgpa(results)
+    value, credits = cgpa_auto_for_user(session, user_id)
     user = session.get(User, user_id)
     if user is not None and user.cgpa_override is not None:
         return Decimal(str(user.cgpa_override)), credits, True

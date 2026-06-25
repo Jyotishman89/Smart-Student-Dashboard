@@ -12,9 +12,9 @@ from ..db import session_scope
 from . import _common as c
 
 
-def _snapshots_as_dicts(user_id: int) -> list[dict]:
+def _snapshots_as_dicts(user_id: int, semester_id: int) -> list[dict]:
     with session_scope() as session:
-        snaps = repo.list_snapshots(session, user_id)
+        snaps = repo.list_snapshots(session, user_id, semester_id)
         return [{
             "id": s.id, "taken_at": s.taken_at, "label": s.semester_label,
             "sgpa": s.sgpa, "total_credits": s.total_credits, "payload": s.payload or {},
@@ -48,16 +48,18 @@ def render() -> None:
             st.toast("Snapshot saved.", icon="💾")
             st.rerun()
 
-    snaps = _snapshots_as_dicts(uid)
+    snaps = _snapshots_as_dicts(uid, sid)
     if not snaps:
-        st.info("No snapshots yet. Save one to start building your CGPA timeline.")
+        st.info(f"No snapshots yet for {state['semester']['label']}. "
+                "Save one to start building this semester's history.")
         return
 
     with a2:
-        labels = {f"{s['taken_at']:%Y-%m-%d %H:%M} — {s['label']} "
+        labels = {f"{s['taken_at']:%Y-%m-%d %H:%M} "
                   f"(SGPA {academics.round_2dp_from_float(s['sgpa'])})": s["id"]
                   for s in snaps}
-        pick = st.selectbox("Restore a snapshot into the active semester", list(labels))
+        pick = st.selectbox(f"Restore a snapshot into {state['semester']['label']}",
+                            list(labels))
         if st.button("↩️ Restore selected", use_container_width=True):
             with session_scope() as session:
                 repo.restore_snapshot(session, sid, labels[pick])
